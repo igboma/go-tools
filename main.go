@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/google/go-github/v53/github"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/oauth2"
@@ -102,8 +105,19 @@ func (r *RealGitRepository) FetchPRs() ([]PR, error) {
 
 // FetchPRBranch fetches the branch of a PR
 func (r *RealGitRepository) FetchPRBranch(pr PR) (*git.Repository, error) {
-	// Implement the logic to fetch the PR branch
-	return &git.Repository{}, nil
+	repo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+		URL:           fmt.Sprintf("https://github.com/%s/%s.git", r.owner, r.repo),
+		ReferenceName: plumbing.NewBranchReferenceName(pr.Branch),
+		SingleBranch:  true,
+		Auth: &http.BasicAuth{
+			Username: "your-username", // replace with your GitHub username
+			Password: os.Getenv("GITHUB_TOKEN"),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return repo, nil
 }
 
 // GetFileContent retrieves the content of a file from a repository
@@ -115,6 +129,10 @@ func (r *RealGitRepository) FetchPRBranch(pr PR) (*git.Repository, error) {
 //		return content, nil
 //	}
 func (r *RealGitRepository) GetFileContent(repo *git.Repository, filePath string) ([]byte, error) {
+	if repo == nil {
+		return nil, fmt.Errorf("invalid repository")
+	}
+
 	ref, err := repo.Head()
 	if err != nil {
 		return nil, err
@@ -315,6 +333,7 @@ func (p *PRProcessor) ProcessBatch() error {
 
 		repo, err := p.repo.FetchPRBranch(pr)
 		if err != nil {
+			fmt.Printf("Error fetching branch for PR %d: %v\n", pr.ID, err)
 			maxCount++
 			p.repo.UpdateCountLabel(pr, maxCount)
 			continue
@@ -325,6 +344,7 @@ func (p *PRProcessor) ProcessBatch() error {
 			if file == "conf.yaml" || strings.HasSuffix(file, "/conf.yaml") {
 				content, err := p.repo.GetFileContent(repo, file)
 				if err != nil {
+					fmt.Printf("Error getting file content for PR %d: %v\n", pr.ID, err)
 					maxCount++
 					p.repo.UpdateCountLabel(pr, maxCount)
 					continue
