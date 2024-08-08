@@ -45,7 +45,7 @@ func (m *MockGitRepository) UpdateBranch(pr PR) error {
 	return args.Error(0)
 }
 
-func (m *MockGitRepository) ListLabels(prID int) ([]string, error) {
-	args := m.Called(prID)
+func (m *MockGitRepository) ListLabels(pr PR) ([]string, error) {
+	args := m.Called(pr)
 	return args.Get(0).([]string), args.Error(1)
 }

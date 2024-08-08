@@ -13,13 +13,13 @@ import (
 // 	processor := NewPRProcessor(mockRepo, 5)
 
 // 	prs := []PR{
-// 		{ID: 1, Branch: "branch-1", Count: 0},
-// 		{ID: 2, Branch: "branch-2", Count: 0},
+// 		{ID: 1, Branch: "refs/pull/1/head", Count: 0},
+// 		{ID: 2, Branch: "refs/pull/2/head", Count: 0},
 // 	}
 
 // 	mockRepo.On("FetchPRs").Return(prs, nil)
-// 	mockRepo.On("ListLabels", 1).Return([]string{"count:1"}, nil)
-// 	mockRepo.On("ListLabels", 2).Return([]string{"count:2"}, nil)
+// 	mockRepo.On("ListLabels", prs[0]).Return([]string{"count:1"}, nil)
+// 	mockRepo.On("ListLabels", prs[1]).Return([]string{"count:2"}, nil)
 // 	mockRepo.On("GetChangedFiles", prs[0]).Return([]string{"conf.yaml"}, nil)
 // 	mockRepo.On("GetChangedFiles", prs[1]).Return([]string{"conf.yaml"}, nil)
 
@@ -30,6 +30,8 @@ import (
 // 	mockRepo.On("GetFileContent", repo, "conf.yaml").Return([]byte(`schedule: "* * * * *"`), nil).Twice()
 // 	mockRepo.On("UpdateCountLabel", prs[0], 1).Return(nil)
 // 	mockRepo.On("UpdateCountLabel", prs[1], 2).Return(nil)
+// 	mockRepo.On("UpdateCountLabel", prs[0], 3).Return(nil) // Adjusting count values
+// 	mockRepo.On("UpdateCountLabel", prs[1], 4).Return(nil) // Adjusting count values
 
 // 	mockRepo.On("MergePR", prs[0]).Return(nil)
 // 	mockRepo.On("MergePR", prs[1]).Return(nil)
