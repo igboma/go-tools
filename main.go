@@ -18,6 +18,7 @@ import (
 )
 
 // PR represents a pull request with a count label
+export GITHUB_TOKEN=ghp_h1n1WHdd0WMdjbodiRRxB3O8GvMIql1coH
 type PR struct {
 	ID     int
 	Branch string
