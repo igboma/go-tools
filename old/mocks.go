@@ -1,11 +1,11 @@
-package main
+package main_old
 
 import (
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockGitRepository is a mock implementation of the GitRepository interface
+// MockGitRepository is a mock implementation of GitRepository
 type MockGitRepository struct {
 	mock.Mock
 }

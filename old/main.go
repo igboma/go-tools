@@ -1,4 +1,4 @@
-package main
+package main_old
 
 import (
 	"bytes"
@@ -121,6 +121,13 @@ func (r *RealGitRepository) FetchPRBranch(pr PR) (*git.Repository, error) {
 }
 
 // GetFileContent retrieves the content of a file from a repository
+//
+//	func (r *RealGitRepository) GetFileContent(repo *git.Repository, filePath string) ([]byte, error) {
+//		// Implement the logic to get the content of a file
+//		// For now, returning a fixed content for testing
+//		content := []byte(`schedule: "* * * * *"`)
+//		return content, nil
+//	}
 func (r *RealGitRepository) GetFileContent(repo *git.Repository, filePath string) ([]byte, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("invalid repository")
@@ -239,6 +246,7 @@ func (r *RealGitRepository) MergePR(pr PR) error {
 			}
 			// Retry the merge after updating the branch
 			result, response, err = r.client.PullRequests.Merge(r.context, r.owner, r.repo, pr.ID, "Merging by bot", nil)
+			//log.Printf("Response: %v", response)
 			if err != nil {
 				log.Printf("Error merging PR %d after updating branch: %v", pr.ID, err)
 				return err
@@ -273,6 +281,7 @@ func NewPRProcessor(repo GitRepository, batchSize int) *PRProcessor {
 	return &PRProcessor{repo: repo, batchSize: batchSize}
 }
 
+// ProcessBatch processes a batch of PRs
 // ProcessBatch processes a batch of PRs
 func (p *PRProcessor) ProcessBatch() error {
 	prs, err := p.repo.FetchPRs()
@@ -364,27 +373,27 @@ func (p *PRProcessor) ProcessBatch() error {
 				fmt.Printf("Checking if current time is within 60 seconds before or after the next schedule, or up to 30 minutes past due.\n")
 				fmt.Printf("Current time: %v\n", time.Now())
 				fmt.Printf("Next schedule time: %v\n", nextScheduleTime)
-				fmt.Printf("60 seconds before next schedule time: %v\n", nextScheduleTime.Add(-60*time.Second))
+				fmt.Printf("30 seconds before next schedule time: %v\n", nextScheduleTime.Add(-60*time.Second))
 				fmt.Printf("30 seconds after next schedule time: %v\n", nextScheduleTime.Add(30*time.Second))
 				fmt.Printf("30 minutes after next schedule time: %v\n", nextScheduleTime.Add(30*time.Minute))
 
 				// Check if the PR is due for merging (within 60 seconds window or up to 30 minutes past due)
-				// if (time.Now().After(nextScheduleTime.Add(-60*time.Second)) && time.Now().Before(nextScheduleTime.Add(30*time.Second))) ||
-				// 	(time.Now().After(nextScheduleTime) && time.Now().Before(nextScheduleTime.Add(30*time.Minute))) {
-				// 	fmt.Printf("Attempting to merge PR %d\n", pr.ID)
-				// 	if err := p.repo.MergePR(pr); err != nil {
-				// 		fmt.Printf("Failed to merge PR %d: %v\n", pr.ID, err)
-				// 		maxCount++
-				// 		p.repo.UpdateCountLabel(pr, maxCount)
-				// 	} else {
-				// 		fmt.Printf("Successfully merged PR %d\n", pr.ID)
-				// 	}
-				// } else {
-				// 	fmt.Printf("PR %d is not due for merging.\n", pr.ID)
-				// 	maxCount++
-				// 	p.repo.UpdateCountLabel(pr, maxCount)
-				// }
-				//break // If we find the configuration file, we don't need to check other files
+				if (time.Now().After(nextScheduleTime.Add(-30*time.Second)) && time.Now().Before(nextScheduleTime.Add(30*time.Second))) ||
+					(time.Now().After(nextScheduleTime) && time.Now().Before(nextScheduleTime.Add(30*time.Minute))) {
+					fmt.Printf("Attempting to merge PR %d\n", pr.ID)
+					if err := p.repo.MergePR(pr); err != nil {
+						fmt.Printf("Failed to merge PR %d: %v\n", pr.ID, err)
+						maxCount++
+						p.repo.UpdateCountLabel(pr, maxCount)
+					} else {
+						fmt.Printf("Successfully merged PR %d\n", pr.ID)
+					}
+				} else {
+					fmt.Printf("PR %d is not due for merging.\n", pr.ID)
+					maxCount++
+					p.repo.UpdateCountLabel(pr, maxCount)
+				}
+				break // If we find the configuration file, we don't need to check other files
 			}
 		}
 	}
