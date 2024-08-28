@@ -10,7 +10,7 @@ on:
 
 jobs:
   call_reusable_workflow:
-    uses: owner/repo/.github/workflows/reusable-workflow.yml@main  # Reusable workflow reference
+    uses: ./.github/workflows/reusable-workflow.yml
     with:
       parameter1: "Value for parameter 1"
       parameter2: "Value for parameter 2"
