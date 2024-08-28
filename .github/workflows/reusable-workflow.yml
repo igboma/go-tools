@@ -20,4 +20,3 @@ jobs:
       - name: Print parameters
         run: |
           echo "Parameter 1: ${{ inputs.parameter1 }}"
-          echo "Parameter 2: ${{ inputs.parameter2 }}"
