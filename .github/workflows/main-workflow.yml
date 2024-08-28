@@ -5,15 +5,25 @@ on:
   push:
     branches:
       - main
-      - feature/*
       - main_test
 
 jobs:
-  call_reusable_workflow:
+  call_reusable_workflow_from_main:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Call reusable workflow from current branch
-        uses: user/repo/.github/workflows/reusable-workflow.yml
+      - name: Call reusable workflow from main branch
+        uses: owner/repo/.github/workflows/reusable-workflow.yml@main
+        with:
+          parameter1: "Value for parameter 1"
+          parameter2: "Value for parameter 2"
+
+  call_reusable_workflow_from_main_test:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main_test'
+    steps:
+      - name: Call reusable workflow from main_test branch
+        uses: owner/repo/.github/workflows/reusable-workflow.yml@main_test
         with:
           parameter1: "Value for parameter 1"
           parameter2: "Value for parameter 2"
