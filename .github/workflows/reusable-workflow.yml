@@ -20,3 +20,4 @@ jobs:
       - name: Print parameters
         run: |
           echo "Parameter 1: ${{ inputs.parameter1 }}"
+          echo "this is refactored code"
