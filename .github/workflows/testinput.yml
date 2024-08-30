@@ -1,0 +1,38 @@
+name: Manual Trigger Action
+
+# This workflow is triggered manually
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Your name'
+        required: true
+        default: 'Michael'
+      greeting:
+        description: 'Type of greeting'
+        required: true
+        default: 'Hello'
+      run-tests:
+        description: 'Run tests'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  manual-job:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the code
+      uses: actions/checkout@v3
+
+    - name: Print greeting message
+      run: |
+        echo "${{ github.event.inputs.greeting }}, ${{ github.event.inputs.name }}!"
+
+    - name: Conditional step based on input
+      if: ${{ github.event.inputs['run-tests'] }}
+      run: |
+        echo "Running tests as requested."
+        # Place your test command here
+        echo "Tests completed."
