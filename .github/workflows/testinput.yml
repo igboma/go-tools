@@ -31,7 +31,7 @@ jobs:
         echo "${{ github.event.inputs.greeting }}, ${{ github.event.inputs.name }}!"
 
     - name: Conditional step based on input
-      if: ${{ github.event.inputs['run-tests'] }}
+      if: ${{ github.event.inputs['run-tests'] == 'true' }}
       run: |
         echo "Running tests as requested."
         # Place your test command here
