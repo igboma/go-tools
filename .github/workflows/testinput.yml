@@ -15,7 +15,6 @@ on:
       run-tests:
         description: 'Run tests'
         required: true
-        default: true
         type: boolean
 
 jobs:
