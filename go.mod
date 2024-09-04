@@ -5,6 +5,7 @@ go 1.22.4
 require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/stretchr/testify v1.9.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
