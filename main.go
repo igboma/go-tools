@@ -251,16 +251,17 @@ func main() {
 			log.Fatalf("Failed to parse previous YAML: %v", err)
 		}
 
+		version = currentConfig.Version
+		heoRevision = currentConfig.HeoRevision
+
 		// Compare the other fields (excluding version and heoRevision)
 		jsonCurrentOtherFields := removeVersionAndHeoRevision(currentConfig)
 		jsonPreviousOtherFields := removeVersionAndHeoRevision(&previousConfig)
 
-		fmt.Printf("+version: %s\n", currentConfig.Version)
+		fmt.Printf("+version: %s\n", version)
 		fmt.Printf("jsonCurrentOtherFields: %s\n", jsonCurrentOtherFields)
 		fmt.Printf("jsonPreviousOtherFields: %s\n", jsonPreviousOtherFields)
 
-		version = currentConfig.Version
-		heoRevision = currentConfig.HeoRevision
 	}
 
 	// Determine if it is a release version
