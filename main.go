@@ -14,20 +14,21 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Define the Config struct to match the conf.yaml structure exactly
 type Config struct {
 	Version                        string `yaml:"version"`
+	VersionOverride                string `yaml:"versionOverride"`
+	Namespace                      string `yaml:"namespace"`
+	GomplateDatasources            string `yaml:"gomplateDatasources"`
+	HeoRoot                        string `yaml:"heoRoot"`
 	HeoRevision                    string `yaml:"heoRevision"`
-	DeploymentSchedule             string `yaml:"deploymentSchedule"`
-	DeploymentWindow               int    `yaml:"deploymentWindow"`
+	HeoRevisionOverride            string `yaml:"heoRevisionOverride"`
 	EnableArgoHookDeleteRedis      string `yaml:"enableArgoHookDeleteRedis"`
 	EnableArgoHookDeleteRedisForce string `yaml:"enableArgoHookDeleteRedisForce"`
 	SlackNotifyChannel             string `yaml:"slackNotifyChannel"`
 	Onboarded                      string `yaml:"onboarded"`
-	Namespace                      string `yaml:"namespace"`
-	GomplateDatasources            string `yaml:"gomplateDatasources"`
-	HeoRevisionOverride            string `yaml:"heoRevisionOverride"`
-	HeoRoot                        string `yaml:"heoRoot"`
-	VersionOverride                string `yaml:"versionOverride"`
+	DeploymentSchedule             string `yaml:"deploymentSchedule"`
+	DeploymentWindow               int    `yaml:"deploymentWindow"`
 }
 
 func main() {
@@ -77,7 +78,7 @@ func main() {
 	var version, heoRevision string
 	if action == "closed" && prMerged == "true" {
 		fmt.Println("PR is merged...")
-		version, heoRevision = getVersionAndRevision(r, "refs/heads/main", file)
+		version, heoRevision = getVersionAndHeoRevision(r, "refs/heads/main", file)
 	} else {
 		fmt.Println("PR is NOT merged...")
 
@@ -119,6 +120,37 @@ func main() {
 	fmt.Printf("VERSION=%s\n", version)
 	fmt.Printf("IS_RELEASE=%s\n", isRelease)
 	fmt.Printf("HEO_REVISION=%s\n", heoRevision)
+}
+
+// getVersionAndHeoRevision retrieves the version and heoRevision from the specified branch
+func getVersionAndHeoRevision(r *git.Repository, branch, file string) (string, string) {
+	// Get the reference for the branch
+	ref, err := r.Reference(plumbing.ReferenceName(branch), true)
+	if err != nil {
+		log.Fatalf("Failed to get reference for branch %s: %v", branch, err)
+	}
+
+	// Get the commit for the branch
+	commit, err := r.CommitObject(ref.Hash())
+	if err != nil {
+		log.Fatalf("Failed to get commit for branch %s: %v", branch, err)
+	}
+
+	// Get the file content from the commit
+	content, err := getFileContentFromCommit(commit, file)
+	if err != nil {
+		log.Fatalf("Failed to get file content from branch %s: %v", branch, err)
+	}
+
+	// Parse the file content as YAML and extract the version and heoRevision
+	var config Config
+	err = yaml.Unmarshal([]byte(content), &config)
+	if err != nil {
+		log.Fatalf("Failed to parse YAML content from branch %s: %v", branch, err)
+	}
+
+	// Return the version and heoRevision
+	return config.Version, config.HeoRevision
 }
 
 func getCurrentConfig(file string) (*Config, error) {
@@ -177,35 +209,6 @@ func getFileContentFromCommit(commit *object.Commit, file string) (string, error
 	}
 
 	return content, nil
-}
-func getVersionAndRevision(r *git.Repository, branch, file string) (string, string) {
-	// Get the reference for the branch
-	ref, err := r.Reference(plumbing.ReferenceName(branch), true)
-	if err != nil {
-		log.Fatalf("Failed to get reference for branch %s: %v", branch, err)
-	}
-
-	// Get the commit for the branch
-	commit, err := r.CommitObject(ref.Hash())
-	if err != nil {
-		log.Fatalf("Failed to get commit for branch %s: %v", branch, err)
-	}
-
-	// Get the file content from the commit
-	content, err := getFileContentFromCommit(commit, file)
-	if err != nil {
-		log.Fatalf("Failed to get file content from branch %s: %v", branch, err)
-	}
-
-	// Parse the file content as YAML and extract the version and heoRevision
-	var config Config
-	err = yaml.Unmarshal([]byte(content), &config)
-	if err != nil {
-		log.Fatalf("Failed to parse YAML content from branch %s: %v", branch, err)
-	}
-
-	// Return the version and heoRevision
-	return config.Version, config.HeoRevision
 }
 
 func removeVersionAndHeoRevision(config *Config) string {
