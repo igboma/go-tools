@@ -35,7 +35,6 @@ type Config struct {
 type GitRepository interface {
 	GetFileContentFromBranch(branch, file string) (string, error)
 	GetFileContentFromCommit(commitHash, file string) (string, error)
-	CheckDiff(branch, file string) (bool, error)
 }
 
 // GitRepositoryImpl is the actual implementation using go-git
@@ -70,75 +69,6 @@ func (g *GitRepositoryImpl) GetFileContentFromCommit(commitHash, file string) (s
 	return getFileContentFromCommit(commit, file)
 }
 
-// CheckDiff checks if there is any difference between the current branch and the specified branch for the given file.
-func (g *GitRepositoryImpl) CheckDiff(branch, file string) (bool, error) {
-	// Get the current worktree
-	worktree, err := g.repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %v", err)
-	}
-
-	// Get the status of the worktree
-	status, err := worktree.Status()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree status: %v", err)
-	}
-
-	// Check if the file has any changes in the working directory
-	if status.File(file).Worktree != git.Unmodified {
-		return true, nil
-	}
-
-	// Get the current branch
-	headRef, err := g.repo.Head()
-	if err != nil {
-		return false, fmt.Errorf("failed to get HEAD reference: %v", err)
-	}
-
-	// Get the branch to compare with
-	branchRef, err := g.repo.Reference(plumbing.ReferenceName(branch), true)
-	if err != nil {
-		return false, fmt.Errorf("failed to get reference for branch %s: %v", branch, err)
-	}
-
-	// Compare commits between the current branch and the specified branch
-	commitsIter, err := g.repo.Log(&git.LogOptions{From: branchRef.Hash()})
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve commit log: %v", err)
-	}
-
-	var currentCommit *object.Commit
-	for {
-		commit, err := commitsIter.Next()
-		if err != nil {
-			break
-		}
-
-		if commit.Hash == headRef.Hash() {
-			currentCommit = commit
-			break
-		}
-	}
-
-	if currentCommit == nil {
-		return false, nil
-	}
-
-	// Get the contents of the file in both branches and compare
-	branchContent, err := g.GetFileContentFromBranch(branch, file)
-	if err != nil {
-		return false, fmt.Errorf("failed to get file content from branch: %v", err)
-	}
-
-	currentContent, err := g.GetFileContentFromCommit(currentCommit.Hash.String(), file)
-	if err != nil {
-		return false, fmt.Errorf("failed to get current file content: %v", err)
-	}
-
-	// Compare the content
-	return branchContent != currentContent, nil
-}
-
 // VersionChecker struct that uses GitRepository to check versions and revisions
 type VersionChecker struct {
 	repo GitRepository
@@ -162,12 +92,34 @@ func (v *VersionChecker) GetVersionAndHeoRevision(branch, file string) (string, 
 	return config.Version, config.HeoRevision, nil
 }
 
-func (v *VersionChecker) CheckVersionDiff(branch, file string) (bool, error) {
-	changed, err := v.repo.CheckDiff(branch, file)
+func checkVersionAndHeoRevisionDiff(r *git.Repository, file string) bool {
+	// Read current file contents
+	currentConfig, err := getCurrentConfig(file)
 	if err != nil {
-		return false, err
+		log.Fatalf("Failed to get current config: %v", err)
 	}
-	return changed, nil
+
+	// Open previous config from origin/main
+	gitRepo := NewGitRepository(r)
+	previousConfigContent, err := gitRepo.GetFileContentFromBranch("refs/remotes/origin/main", file)
+	if err != nil {
+		log.Fatalf("Failed to get previous config: %v", err)
+	}
+
+	var previousConfig Config
+	err = yaml.Unmarshal([]byte(previousConfigContent), &previousConfig)
+	if err != nil {
+		log.Fatalf("Failed to parse previous YAML: %v", err)
+	}
+
+	// Compare version and heoRevision
+	if currentConfig.Version != previousConfig.Version || currentConfig.HeoRevision != previousConfig.HeoRevision {
+		fmt.Println("Version or heoRevision has changed")
+		return true
+	}
+
+	fmt.Println("No version or heoRevision change. Skipping creation of deployment.")
+	return false
 }
 
 // Main logic
@@ -225,21 +177,19 @@ func main() {
 	} else {
 		fmt.Println("PR is NOT merged...")
 
-		changed, err := checker.CheckVersionDiff("refs/remotes/origin/main", file)
-		if err != nil {
-			log.Fatalf("Failed to check version diff: %v", err)
-		}
-
-		if !changed {
-			fmt.Println("No version or heoRevision change. Skipping creation of deployment.")
+		// Check if version or heoRevision has changed
+		if !checkVersionAndHeoRevisionDiff(r, file) {
+			// Exit if there is no version or heoRevision change
 			os.Exit(0)
 		}
 
+		// Fetch current config for the remaining fields
 		currentConfig, err := getCurrentConfig(file)
 		if err != nil {
 			log.Fatalf("Failed to get current config: %v", err)
 		}
 
+		// Fetch previous config for comparison
 		previousConfigContent, err := gitRepo.GetFileContentFromBranch("refs/remotes/origin/main", file)
 		if err != nil {
 			log.Fatalf("Failed to get previous config: %v", err)
@@ -251,17 +201,16 @@ func main() {
 			log.Fatalf("Failed to parse previous YAML: %v", err)
 		}
 
-		version = currentConfig.Version
-		heoRevision = currentConfig.HeoRevision
-
-		// Compare the other fields (excluding version and heoRevision)
+		// Compare non-version and non-heoRevision fields
 		jsonCurrentOtherFields := removeVersionAndHeoRevision(currentConfig)
 		jsonPreviousOtherFields := removeVersionAndHeoRevision(&previousConfig)
 
-		fmt.Printf("+version: %s\n", version)
+		fmt.Printf("+version: %s\n", currentConfig.Version)
 		fmt.Printf("jsonCurrentOtherFields: %s\n", jsonCurrentOtherFields)
 		fmt.Printf("jsonPreviousOtherFields: %s\n", jsonPreviousOtherFields)
 
+		version = currentConfig.Version
+		heoRevision = currentConfig.HeoRevision
 	}
 
 	// Determine if it is a release version
