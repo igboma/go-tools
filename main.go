@@ -157,6 +157,7 @@ func main() {
 	// Extract COMPONENT and ENVIRONMENT
 	component := strings.Split(file, "/")[1]
 	environment := strings.Split(file, "/")[2]
+	needDeployment := false
 
 	// Open the repository
 	r, err := git.PlainOpen(repoPath)
@@ -180,7 +181,10 @@ func main() {
 		// Check if version or heoRevision has changed
 		if !checkVersionAndHeoRevisionDiff(r, file) {
 			// Exit if there is no version or heoRevision change
-			os.Exit(0)
+			//os.Exit(0)
+			needDeployment = false
+		} else {
+			needDeployment = true
 		}
 
 		// Fetch current config for the remaining fields
@@ -226,12 +230,14 @@ func main() {
 	writeOutput(outputFile, "VERSION", version)
 	writeOutput(outputFile, "IS_RELEASE", isRelease)
 	writeOutput(outputFile, "HEO_REVISION", heoRevision)
+	writeOutput(outputFile, "DEPLOYMENT_NEEDED", fmt.Sprintf("%t", needDeployment))
 
 	fmt.Printf("COMPONENT=%s\n", component)
 	fmt.Printf("ENVIRONMENT=%s\n", environment)
 	fmt.Printf("VERSION=%s\n", version)
 	fmt.Printf("IS_RELEASE=%s\n", isRelease)
 	fmt.Printf("HEO_REVISION=%s\n", heoRevision)
+	fmt.Printf("DEPLOYMENT_NEEDED=%s\n", fmt.Sprintf("%t", needDeployment))
 }
 
 // Utility Functions

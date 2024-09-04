@@ -82,10 +82,10 @@ package main
 // 	} else {
 // 		fmt.Println("PR is NOT merged...")
 
-// 		if !checkVersionAndHeoRevisionDiff(r, file) {
-// 			fmt.Println("No version or heoRevision change. Skipping creation of deployment.")
-// 			os.Exit(0)
-// 		}
+// if !checkVersionAndHeoRevisionDiff(r, file) {
+// 	fmt.Println("No version or heoRevision change. Skipping creation of deployment.")
+// 	os.Exit(0)
+// }
 
 // 		currentConfig, _ := getCurrentConfig(file)
 // 		previousConfig, _ := getPreviousConfig(r, "refs/remotes/origin/main", file)
