@@ -26,6 +26,7 @@ func main() {
 	action := os.Getenv("GITHUB_EVENT_ACTION")
 	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
 	outputFile := os.Getenv("GITHUB_OUTPUT")
+	fmt.Printf("GITHUB OUTOUT %s \n", outputFile)
 
 	// Split the changed files into an array
 	files := strings.Split(changedFiles, "\n")

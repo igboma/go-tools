@@ -137,36 +137,6 @@ func (v *VersionChecker) GetVersionAndHeoRevision(branch, file string) (string, 
 	return config.Version, config.HeoRevision, nil
 }
 
-// func CheckVersionAndHeoRevisionDiff(r *git.Repository, file string) bool {
-// 	// Read current file contents
-// 	currentConfig, err := GetCurrentConfig(file)
-// 	if err != nil {
-// 		log.Fatalf("Failed to get current config: %v", err)
-// 	}
-
-// 	// Open previous config from origin/main
-// 	gitRepo := NewGitRepository(r)
-// 	previousConfigContent, err := gitRepo.GetFileContentFromBranch("refs/remotes/origin/main", file)
-// 	if err != nil {
-// 		log.Fatalf("Failed to get previous config: %v", err)
-// 	}
-
-// 	var previousConfig Config
-// 	err = yaml.Unmarshal([]byte(previousConfigContent), &previousConfig)
-// 	if err != nil {
-// 		log.Fatalf("Failed to parse previous YAML: %v", err)
-// 	}
-
-// 	// Compare version and heoRevision
-// 	if currentConfig.Version != previousConfig.Version || currentConfig.HeoRevision != previousConfig.HeoRevision {
-// 		fmt.Println("Version or heoRevision has changed")
-// 		return true
-// 	}
-
-// 	fmt.Println("No version or heoRevision change. Skipping creation of deployment.")
-// 	return false
-// }
-
 func CheckVersionAndHeoRevisionDiff(gitRepo GitRepository, loader ConfigLoader, file string) (bool, error) {
 	// Read current file contents
 	currentConfig, err := loader.LoadConfig(file)
