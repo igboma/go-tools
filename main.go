@@ -29,6 +29,10 @@ func main() {
 	//go run main.go https://github.com/qlik-trial/helm-environment-overrides /Users/rza/workspace/helprepo/override  main
 	//https://github.com/qlik-trial/helm-environment-overrides
 
+	// go run main.go --workspace "/Users/rza/workspace/helprepo/cd-pipeline" \
+	//       --pr-number "38" \
+	//       --git-url "https://github.com/igboma/cd-pipeline"
+
 	var workspace string
 	var prNumber int
 	var gitURL string
@@ -51,6 +55,8 @@ func main() {
 	fmt.Printf("Workspace: %s\n", workspace)
 	fmt.Printf("PR Number: %d\n", prNumber)
 	fmt.Printf("Git URL: %s\n", gitURL)
+
+	gitURL = "https://github.com/igboma/cd-pipeline"
 
 	deployChecker(workspace, gitURL, prNumber)
 }
