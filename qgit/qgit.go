@@ -38,20 +38,41 @@ func (gr *Qgit) Head() (QReference, error) {
 	return ref, err
 }
 
+// Fetch fetches the given Git reference to ensure that it is available in the local repository.
+// It synchronizes the local repository with the remote branch.
+//
+// Parameters:
+//   - ref: The reference to fetch, typically a branch or tag.
+//
+// Returns:
+//   - error: Returns an error if the fetch operation fails, or nil if successful.
 func (gr *Qgit) Fetch(ref string) error {
 	return gr.Repo.Fetch(ref)
 }
 
+// GetChangedFilesByPRNumber retrieves the list of files that have been changed in the specified pull request.
+//
+// Parameters:
+//   - pr: The pull request number.
+//
+// Returns:
+//   - []string: A list of file paths that were changed in the PR.
+//   - error: Returns an error if the operation fails, or nil if successful.
 func (gr *Qgit) GetChangedFilesByPRNumber(pr int) ([]string, error) {
 	return gr.Repo.GetChangedFilesByPRNumber(pr)
 }
 
+// GetChangedFilesByPRNumberFilesEndingWithYAML retrieves the list of changed files in the specified pull request
+// that end with "conf.yaml".
+//
+// Parameters:
+//   - pr: The pull request number.
+//
+// Returns:
+//   - []string: A list of file paths that end with "conf.yaml" and were changed in the PR.
+//   - error: Returns an error if the operation fails, or nil if successful.
 func (gr *Qgit) GetChangedFilesByPRNumberFilesEndingWithYAML(pr int) ([]string, error) {
 	return gr.Repo.GetChangedFilesByPRNumberFilesMatching(pr, "conf.yaml")
-}
-
-func (gr *Qgit) PR() error {
-	return nil
 }
 
 // Checkout checks out the specified Git reference (branch, tag, or commit hash) in the repository.
