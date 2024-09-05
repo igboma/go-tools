@@ -9,10 +9,9 @@ import (
 func Runner(url, directory, ref, token string) {
 
 	options := QgitOptions{
-		Url:    url,
-		Path:   directory,
-		IsBare: false,
-		Token:  token,
+		Url:   url,
+		Path:  directory,
+		Token: token,
 	}
 	var repo GitRepository = &GitRepo{Option: &options}
 	// Handle error from NewQGit

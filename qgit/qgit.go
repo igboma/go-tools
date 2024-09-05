@@ -20,10 +20,9 @@ type QReference struct {
 
 // QgitOptions contains the options required for initializing or cloning a Git repository.
 type QgitOptions struct {
-	Path   string
-	Url    string
-	IsBare bool
-	Token  string
+	Path  string
+	Url   string
+	Token string
 }
 
 // QgitCheckoutOptions provides options for checking out a Git reference, including branches, tags, or commit hashes.

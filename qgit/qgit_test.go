@@ -27,9 +27,8 @@ func TestInit(t *testing.T) {
 	t.Run("Repository does not exist locally; cloning succeeds", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Mock the Stat and PlainClone methods
@@ -54,9 +53,8 @@ func TestInit(t *testing.T) {
 	t.Run("Repository exists locally; opening succeeds", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Mock Stat and PlainOpen methods
@@ -74,9 +72,8 @@ func TestInit(t *testing.T) {
 	t.Run("Repository exists locally; opening fails", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Mock Stat and PlainOpen methods
@@ -99,9 +96,8 @@ func TestNewQGit(t *testing.T) {
 		// Create a new mock GitRepository using the NewGitRepository function
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Mock the Stat, PlainClone, and PlainOpen methods
@@ -123,7 +119,7 @@ func TestNewQGit(t *testing.T) {
 	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
-	// 		IsBare: false,
+	//
 	// 	}
 
 	// 	// Simulate Init failure due to cloning error
@@ -140,7 +136,7 @@ func TestNewQGit(t *testing.T) {
 	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
-	// 		IsBare: false,
+	//
 	// 	}
 
 	// 	// Simulate successful Init with existing repo
@@ -157,7 +153,7 @@ func TestNewQGit(t *testing.T) {
 	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
-	// 		IsBare: false,
+	//
 	// 	}
 
 	// 	// Simulate Init failure due to open repo error
@@ -179,7 +175,7 @@ func TestCheckout(t *testing.T) {
 	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
-	// 		IsBare: false,
+	//
 	// 	}
 
 	// 	// mockRepo.On("Checkout", "main").Return(nil).Run(func(args mock.Arguments) {
@@ -210,9 +206,8 @@ func TestCheckout(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		//mockWorktree := new(mocks.GitWorktree)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Simulate Init and CheckRemoteRef finding a tag
@@ -239,9 +234,8 @@ func TestCheckout(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		//mockWorktree := new(mocks.GitWorktree)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Simulate Init and CheckRemoteRef finding a commit hash
@@ -267,9 +261,8 @@ func TestCheckout(t *testing.T) {
 	t.Run("Reference does not exist", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		// Simulate Init and CheckRemoteRef failing to find the reference
@@ -298,9 +291,8 @@ func TestQgit_Head(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 		expectedRef := qgit.QReference{
 			ReferenceName: "refs/heads/main",
@@ -337,9 +329,8 @@ func TestQgit_Head(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 		expectedErr := errors.New("failed to get HEAD")
 
@@ -374,9 +365,8 @@ func TestQgit_Fetch(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 
 		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
@@ -405,9 +395,8 @@ func TestQgit_Fetch(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
 		options := qgit.QgitOptions{
-			Path:   "/test/repo",
-			Url:    "https://github.com/test/repo.git",
-			IsBare: false,
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
 		}
 		expectedErr := errors.New("network error")
 

@@ -75,7 +75,7 @@ func (gr *GitRepo) Checkout(ref string) error {
 
 func (gr *GitRepo) PlainClone(o QgitOptions) error {
 	var err error = nil
-	repo, err := git.PlainClone(o.Path, o.IsBare, &git.CloneOptions{
+	repo, err := git.PlainClone(o.Path, false, &git.CloneOptions{
 		URL: o.Url,
 		Auth: &http.BasicAuth{
 			Username: "git",   // Can be anything, GitHub ignores it

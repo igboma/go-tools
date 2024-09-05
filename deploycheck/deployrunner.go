@@ -21,10 +21,9 @@ func DeployChecker(directory string, url string, prNumber int) {
 	fmt.Printf("prNumber %v \n", prNumber)
 
 	options := qgit.QgitOptions{
-		Url:    url,
-		Path:   directory,
-		IsBare: false,
-		Token:  token,
+		Url:   url,
+		Path:  directory,
+		Token: token,
 	}
 	var repo qgit.GitRepository = &qgit.GitRepo{Option: &options}
 	// Handle error from NewQGit
