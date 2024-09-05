@@ -169,29 +169,119 @@ func (_m *GitRepository) GetChangedFilesByPRNumber(prNumber int) ([]string, erro
 	return r0, r1
 }
 
-// GetChangedFilesByPRNumberFilesEndingWithYAML provides a mock function with given fields: prNumber
-func (_m *GitRepository) GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber int) ([]string, error) {
-	ret := _m.Called(prNumber)
+// GetChangedFilesByPRNumberFileExtMatch provides a mock function with given fields: prNumber, fileExt
+func (_m *GitRepository) GetChangedFilesByPRNumberFileExtMatch(prNumber int, fileExt string) ([]string, error) {
+	ret := _m.Called(prNumber, fileExt)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetChangedFilesByPRNumberFilesEndingWithYAML")
+		panic("no return value specified for GetChangedFilesByPRNumberFileExtMatch")
 	}
 
 	var r0 []string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(int) ([]string, error)); ok {
-		return rf(prNumber)
+	if rf, ok := ret.Get(0).(func(int, string) ([]string, error)); ok {
+		return rf(prNumber, fileExt)
 	}
-	if rf, ok := ret.Get(0).(func(int) []string); ok {
-		r0 = rf(prNumber)
+	if rf, ok := ret.Get(0).(func(int, string) []string); ok {
+		r0 = rf(prNumber, fileExt)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(int) error); ok {
-		r1 = rf(prNumber)
+	if rf, ok := ret.Get(1).(func(int, string) error); ok {
+		r1 = rf(prNumber, fileExt)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetChangedFilesByPRNumberFilesByFilter provides a mock function with given fields: prNumber, functionThatImplementsFilter
+func (_m *GitRepository) GetChangedFilesByPRNumberFilesByFilter(prNumber int, functionThatImplementsFilter func(string) bool) ([]string, error) {
+	ret := _m.Called(prNumber, functionThatImplementsFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChangedFilesByPRNumberFilesByFilter")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int, func(string) bool) ([]string, error)); ok {
+		return rf(prNumber, functionThatImplementsFilter)
+	}
+	if rf, ok := ret.Get(0).(func(int, func(string) bool) []string); ok {
+		r0 = rf(prNumber, functionThatImplementsFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int, func(string) bool) error); ok {
+		r1 = rf(prNumber, functionThatImplementsFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetChangedFilesByPRNumberFilesByRegex provides a mock function with given fields: prNumber, regexFilter
+func (_m *GitRepository) GetChangedFilesByPRNumberFilesByRegex(prNumber int, regexFilter string) ([]string, error) {
+	ret := _m.Called(prNumber, regexFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChangedFilesByPRNumberFilesByRegex")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int, string) ([]string, error)); ok {
+		return rf(prNumber, regexFilter)
+	}
+	if rf, ok := ret.Get(0).(func(int, string) []string); ok {
+		r0 = rf(prNumber, regexFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int, string) error); ok {
+		r1 = rf(prNumber, regexFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetChangedFilesByPRNumberFilesMatching provides a mock function with given fields: prNumber, fileName
+func (_m *GitRepository) GetChangedFilesByPRNumberFilesMatching(prNumber int, fileName string) ([]string, error) {
+	ret := _m.Called(prNumber, fileName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChangedFilesByPRNumberFilesMatching")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int, string) ([]string, error)); ok {
+		return rf(prNumber, fileName)
+	}
+	if rf, ok := ret.Get(0).(func(int, string) []string); ok {
+		r0 = rf(prNumber, fileName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int, string) error); ok {
+		r1 = rf(prNumber, fileName)
 	} else {
 		r1 = ret.Error(1)
 	}

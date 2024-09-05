@@ -48,7 +48,7 @@ func (gr *Qgit) GetChangedFilesByPRNumber(pr int) ([]string, error) {
 }
 
 func (gr *Qgit) GetChangedFilesByPRNumberFilesEndingWithYAML(pr int) ([]string, error) {
-	return gr.Repo.GetChangedFilesByPRNumberFilesEndingWithYAML(pr)
+	return gr.Repo.GetChangedFilesByPRNumberFilesMatching(pr, "conf.yaml")
 }
 
 func (gr *Qgit) PR() error {

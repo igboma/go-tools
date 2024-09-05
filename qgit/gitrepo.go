@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -39,7 +40,10 @@ type GitRepository interface {
 	GetFileContentFromBranch(branch, file string) (string, error)
 	GetFileContentFromCommit(commitHash, file string) (string, error)
 	GetChangedFilesByPRNumber(prNumber int) ([]string, error)
-	GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber int) ([]string, error)
+	GetChangedFilesByPRNumberFileExtMatch(prNumber int, fileExt string) ([]string, error)
+	GetChangedFilesByPRNumberFilesMatching(prNumber int, fileName string) ([]string, error)
+	GetChangedFilesByPRNumberFilesByRegex(prNumber int, regexFilter string) ([]string, error)
+	GetChangedFilesByPRNumberFilesByFilter(prNumber int, functionThatImplementsFilter func(string) bool) ([]string, error)
 }
 
 type PullRequest struct {
@@ -303,8 +307,6 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 	// Usually PR references are in the form: refs/pull/{prNumber}/head
 	prRef := fmt.Sprintf("refs/pull/%d/head", prNumber)
 
-	fmt.Printf("pref %v==>\n", prRef)
-
 	// Fetch the remote branch (PR branch) to ensure the reference exists locally
 	err := gr.Repo.Fetch(&git.FetchOptions{
 		RemoteName: "origin",
@@ -321,7 +323,6 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 	// Get the current HEAD reference (main branch)
 	currentRef, err := gr.Repo.Head()
 
-	fmt.Printf("currentRef ==>%v \n", currentRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
 	}
@@ -331,23 +332,17 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve reference %s: %w", prRef, err)
 	}
-
-	fmt.Printf("compareRef==>  %v\n", compareRef)
-
 	// Get the commit for the comparison reference (PR branch)
 	compareCommit, err := gr.Repo.CommitObject(compareRef.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit for ref %s: %w", prRef, err)
 	}
 
-	fmt.Printf("compareCommit==> %v\n", compareCommit)
 	// Get the commit for the current HEAD reference (main branch)
 	currentCommit, err := gr.Repo.CommitObject(currentRef.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current commit: %w", err)
 	}
-
-	fmt.Printf("currentCommit %v==>", currentCommit)
 
 	// Get the file changes between the two commits
 	patch, err := currentCommit.Patch(compareCommit)
@@ -355,21 +350,37 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 		return nil, fmt.Errorf("failed to calculate patch: %w", err)
 	}
 
-	fmt.Printf("patch %v==>", patch)
-
 	// Collect the list of changed files
 	var changedFiles []string
 	for _, fileStat := range patch.Stats() {
 		changedFiles = append(changedFiles, fileStat.Name)
 	}
 
-	fmt.Printf("changedFiles %v==>", changedFiles)
-
 	return changedFiles, nil
 }
 
-// GetChangedFilesByPRNumberFilesEndingWithYAML fetches the changed files in a given PR number and filters for files that end with `.yaml`.
-func (gr *GitRepo) GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber int) ([]string, error) {
+// GetChangedFilesByPRNumberFilesMatching fetches the changed files in a given PR number
+// and filters for files that exactly match the provided filename (case-insensitive).
+func (gr *GitRepo) GetChangedFilesByPRNumberFilesMatching(prNumber int, fileName string) ([]string, error) {
+	// Call the existing function to get all changed files by PR number
+	changedFiles, err := gr.GetChangedFilesByPRNumber(prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files for PR %d: %w", prNumber, err)
+	}
+
+	// Filter the files to only include those that match the provided filename
+	var matchingFiles []string
+	for _, file := range changedFiles {
+		// Extract the base name of the file and check if it matches the given filename
+		if strings.EqualFold(filepath.Base(file), fileName) {
+			matchingFiles = append(matchingFiles, file)
+		}
+	}
+
+	return matchingFiles, nil
+}
+
+func (gr *GitRepo) GetChangedFilesByPRNumberFileExtMatch(prNumber int, fileExt string) ([]string, error) {
 	// Call the existing function to get all changed files by PR number
 	changedFiles, err := gr.GetChangedFilesByPRNumber(prNumber)
 	if err != nil {
@@ -379,10 +390,52 @@ func (gr *GitRepo) GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber int) ([
 	// Filter the files to only include those that end with `.yaml`
 	var yamlFiles []string
 	for _, file := range changedFiles {
-		if strings.EqualFold(filepath.Ext(file), ".yaml") {
+		if strings.EqualFold(filepath.Ext(file), fileExt) {
 			yamlFiles = append(yamlFiles, file)
 		}
 	}
-
 	return yamlFiles, nil
+}
+
+// GetChangedFilesByPRNumberFilesByRegex fetches the changed files by PR number
+// and filters them using the provided regular expression.
+func (gr *GitRepo) GetChangedFilesByPRNumberFilesByRegex(prNumber int, regexFilter string) ([]string, error) {
+	changedFiles, err := gr.GetChangedFilesByPRNumber(prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files for PR %d: %w", prNumber, err)
+	}
+
+	// Compile the regex filter
+	filterRegex, err := regexp.Compile(regexFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile regex filter: %w", err)
+	}
+
+	// Filter the files based on the regex
+	var filteredFiles []string
+	for _, file := range changedFiles {
+		if filterRegex.MatchString(file) {
+			filteredFiles = append(filteredFiles, file)
+		}
+	}
+
+	return filteredFiles, nil
+}
+
+// GetChangedFilesByPRNumberFilesByFilter fetches the changed files by PR number and filters them using a provided function.
+func (gr *GitRepo) GetChangedFilesByPRNumberFilesByFilter(prNumber int, functionThatImplementsFilter func(string) bool) ([]string, error) {
+	changedFiles, err := gr.GetChangedFilesByPRNumber(prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files for PR %d: %w", prNumber, err)
+	}
+
+	// Filter the files based on the provided function
+	var filteredFiles []string
+	for _, file := range changedFiles {
+		if functionThatImplementsFilter(file) {
+			filteredFiles = append(filteredFiles, file)
+		}
+	}
+
+	return filteredFiles, nil
 }

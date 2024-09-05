@@ -56,8 +56,6 @@ func main() {
 	fmt.Printf("PR Number: %d\n", prNumber)
 	fmt.Printf("Git URL: %s\n", gitURL)
 
-	gitURL = "https://github.com/igboma/cd-pipeline"
-
 	deployChecker(workspace, gitURL, prNumber)
 }
 
@@ -76,8 +74,8 @@ func deployChecker(directory string, url string, prNumber int) {
 	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
 	outputFile := os.Getenv("GITHUB_OUTPUT")
 	token := os.Getenv("GITHUB_TOKEN")
-	fmt.Printf("GITHUB OUTOUT %s \n", outputFile)
 
+	fmt.Printf("GITHUB OUTPUT %s \n", outputFile)
 	fmt.Printf("token %v \n", token)
 
 	fmt.Printf("GITHUB directory %v \n", directory)
@@ -105,9 +103,6 @@ func deployChecker(directory string, url string, prNumber int) {
 		log.Fatalf("GetChangedFilesByPRNumberFilesEndingWithYAML err %v", err)
 	}
 
-	// Split the changed files into an array
-	//files := strings.Split(changedFiles, "\n")
-
 	// Ensure only one file was changed
 	if len(files) > 1 {
 		log.Fatalf("More than one file was changed")
@@ -127,14 +122,6 @@ func deployChecker(directory string, url string, prNumber int) {
 	environment := strings.Split(file, "/")[2]
 	needDeployment := false
 
-	// // Open the repository
-	// _, err := git.PlainOpen(directory)
-	// if err != nil {
-	// 	log.Fatalf("Failed to open repository at %s: %v", directory, err)
-	// }
-
-	// Create GitRepository and ConfigLoader instances
-	//gitRepo := deploycheck.NewGitRepository(r)
 	configLoader := &deploycheck.FileConfigLoader{} // FileConfigLoader for loading the config
 
 	checker := deploycheck.NewVersionChecker(qGit.Repo)

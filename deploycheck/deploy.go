@@ -27,21 +27,6 @@ type Config struct {
 	DeploymentWindow               int    `yaml:"deploymentWindow"`
 }
 
-// GitRepository interface to abstract git repository operations
-// type GitRepository interface {
-// 	GetFileContentFromBranch(branch, file string) (string, error)
-// 	GetFileContentFromCommit(commitHash, file string) (string, error)
-// }
-
-// // GitRepositoryImpl is the actual implementation using go-git
-// type GitRepositoryImpl struct {
-// 	repo *git.Repository
-// }
-
-// func NewGitRepository(repo *git.Repository) *GitRepositoryImpl {
-// 	return &GitRepositoryImpl{repo: repo}
-// }
-
 // ConfigLoader interface
 type ConfigLoader interface {
 	LoadConfig(filePath string) (*Config, error)
@@ -62,29 +47,6 @@ func (f *FileConfigLoader) LoadConfig(filePath string) (*Config, error) {
 	}
 	return &config, nil
 }
-
-// func (g *GitRepositoryImpl) GetFileContentFromBranch(branch, file string) (string, error) {
-// 	ref, err := g.repo.Reference(plumbing.ReferenceName(branch), true)
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	commit, err := g.repo.CommitObject(ref.Hash())
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return GetFileContentFromCommit(commit, file)
-// }
-
-// func (g *GitRepositoryImpl) GetFileContentFromCommit(commitHash, file string) (string, error) {
-// 	commit, err := g.repo.CommitObject(plumbing.NewHash(commitHash))
-// 	if err != nil {
-// 		return "", err
-// 	}
-
-// 	return GetFileContentFromCommit(commit, file)
-// }
 
 // VersionChecker struct that uses GitRepository to check versions and revisions
 type VersionChecker struct {
@@ -111,8 +73,10 @@ func (v *VersionChecker) GetVersionAndHeoRevision(branch, file string) (string, 
 
 func CheckVersionAndHeoRevisionDiff(gitRepo qgit.GitRepository, loader ConfigLoader, file string) (bool, error) {
 	// Read current file contents
+	fmt.Printf("CheckVersionAndHeoRevisionDiff file Path ==> %v", file)
 	currentConfig, err := loader.LoadConfig(file)
 	if err != nil {
+		fmt.Printf("CheckVersionAndHeoRevisionDiff file Path err ==> %v", err)
 		return false, err
 	}
 
