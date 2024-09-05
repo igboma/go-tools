@@ -303,6 +303,8 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 	// Usually PR references are in the form: refs/pull/{prNumber}/head
 	prRef := fmt.Sprintf("refs/pull/%d/head", prNumber)
 
+	fmt.Printf("pref %v==>", prRef)
+
 	// Fetch the remote branch (PR branch) to ensure the reference exists locally
 	err := gr.Repo.Fetch(&git.FetchOptions{
 		RemoteName: "origin",
@@ -318,6 +320,8 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 
 	// Get the current HEAD reference (main branch)
 	currentRef, err := gr.Repo.Head()
+
+	fmt.Printf("currentRef %v==>", currentRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
 	}
@@ -328,17 +332,22 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 		return nil, fmt.Errorf("failed to resolve reference %s: %w", prRef, err)
 	}
 
+	fmt.Printf("compareRef %v==>", compareRef)
+
 	// Get the commit for the comparison reference (PR branch)
 	compareCommit, err := gr.Repo.CommitObject(compareRef.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commit for ref %s: %w", prRef, err)
 	}
 
+	fmt.Printf("compareCommit %v==>", compareCommit)
 	// Get the commit for the current HEAD reference (main branch)
 	currentCommit, err := gr.Repo.CommitObject(currentRef.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current commit: %w", err)
 	}
+
+	fmt.Printf("currentCommit %v==>", currentCommit)
 
 	// Get the file changes between the two commits
 	patch, err := currentCommit.Patch(compareCommit)
@@ -346,11 +355,15 @@ func (gr *GitRepo) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
 		return nil, fmt.Errorf("failed to calculate patch: %w", err)
 	}
 
+	fmt.Printf("patch %v==>", patch)
+
 	// Collect the list of changed files
 	var changedFiles []string
 	for _, fileStat := range patch.Stats() {
 		changedFiles = append(changedFiles, fileStat.Name)
 	}
+
+	fmt.Printf("changedFiles %v==>", changedFiles)
 
 	return changedFiles, nil
 }
