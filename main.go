@@ -88,6 +88,8 @@ func deployChecker(directory string, url string, prNumber int) {
 
 	files, err := qGit.GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber)
 
+	fmt.Printf("GetChangedFilesByPRNumberFilesEndingWithYAML FILES: %s\n", files)
+
 	if err != nil {
 		log.Fatalf("GetChangedFilesByPRNumberFilesEndingWithYAML err %v", err)
 	}

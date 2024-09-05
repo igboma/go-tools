@@ -36,9 +36,9 @@ func Runner(url, directory, ref, token string) {
 	}
 	fmt.Println("HEAD Commit:", refInfo.Hash)
 
-	// res, err2 := qGit.GetChangedFilesEndingWithYAML("igboma-patch-27")
-	// if err2 != nil {
-	// 	fmt.Printf("err2 %v \n", err2)
-	// }
-	// fmt.Printf("returned %v \n", res)
+	res, err2 := qGit.GetChangedFilesByPRNumberFilesEndingWithYAML(37)
+	if err2 != nil {
+		fmt.Printf("err2 %v \n", err2)
+	}
+	fmt.Printf("returned %v \n", res)
 }
