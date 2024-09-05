@@ -74,7 +74,6 @@ func (gr *GitRepo) Checkout(ref string) error {
 }
 
 func (gr *GitRepo) PlainClone(o QgitOptions) error {
-	fmt.Println("Repository does not exist locally. Cloning here...")
 	var err error = nil
 	repo, err := git.PlainClone(o.Path, o.IsBare, &git.CloneOptions{
 		URL: o.Url,
@@ -88,13 +87,11 @@ func (gr *GitRepo) PlainClone(o QgitOptions) error {
 }
 
 func (gr *GitRepo) PlainOpen(o QgitOptions) error {
-	fmt.Println("Repository exists locally. Opening...")
 	repo, err := git.PlainOpen(o.Path)
 	if err != nil {
 		return fmt.Errorf("error opening repository: %w", err)
 	}
 	gr.Repo = repo
-	fmt.Println("Repository opened successfully.")
 
 	return nil
 }
@@ -436,6 +433,5 @@ func (gr *GitRepo) GetChangedFilesByPRNumberFilesByFilter(prNumber int, function
 			filteredFiles = append(filteredFiles, file)
 		}
 	}
-
 	return filteredFiles, nil
 }

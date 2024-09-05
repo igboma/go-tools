@@ -3,14 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"os"
-	"strings"
 
 	"gitpkg/deploycheck"
-	"gitpkg/qgit"
-
-	"gopkg.in/yaml.v2"
 )
 
 func main() {
@@ -56,144 +50,130 @@ func main() {
 	fmt.Printf("PR Number: %d\n", prNumber)
 	fmt.Printf("Git URL: %s\n", gitURL)
 
-	deployChecker(workspace, gitURL, prNumber)
+	deploycheck.DeployChecker(workspace, gitURL, prNumber)
 }
 
-// Main logic
-func deployChecker(directory string, url string, prNumber int) {
-	// Check if the repository path is passed as a command-line argument
-	// if len(os.Args) < 2 {
-	// 	log.Fatalf("Usage: go-tools <repo-path>")
-	// }
+// // Main logic
+// func deployChecker(directory string, url string, prNumber int) {
+// 	// Check if the repository path is passed as a command-line argument
+// 	// if len(os.Args) < 2 {
+// 	// 	log.Fatalf("Usage: go-tools <repo-path>")
+// 	// }
 
-	//repoPath := os.Args[1]
+// 	//repoPath := os.Args[1]
 
-	// Retrieve environment variables (set in GitHub Actions)
-	//changedFiles := os.Getenv("CHANGED_FILES")
-	action := os.Getenv("GITHUB_EVENT_ACTION")
-	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
-	outputFile := os.Getenv("GITHUB_OUTPUT")
-	token := os.Getenv("GITHUB_TOKEN")
+// 	// Retrieve environment variables (set in GitHub Actions)
+// 	//changedFiles := os.Getenv("CHANGED_FILES")
+// 	action := os.Getenv("GITHUB_EVENT_ACTION")
+// 	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
+// 	outputFile := os.Getenv("GITHUB_OUTPUT")
+// 	token := os.Getenv("GITHUB_TOKEN")
 
-	fmt.Printf("GITHUB OUTPUT %s \n", outputFile)
-	fmt.Printf("token %v \n", token)
+// 	fmt.Printf("GITHUB OUTPUT %s \n", outputFile)
+// 	fmt.Printf("token %v \n", token)
 
-	fmt.Printf("GITHUB directory %v \n", directory)
-	fmt.Printf("url %v \n", url)
-	fmt.Printf("prNumber %v \n", prNumber)
+// 	fmt.Printf("GITHUB directory %v \n", directory)
+// 	fmt.Printf("url %v \n", url)
+// 	fmt.Printf("prNumber %v \n", prNumber)
 
-	options := qgit.QgitOptions{
-		Url:    url,
-		Path:   directory,
-		IsBare: false,
-		Token:  token,
-	}
-	var repo qgit.GitRepository = &qgit.GitRepo{Option: &options}
-	// Handle error from NewQGit
-	qGit, err := qgit.NewQGit(&options, repo)
-	if err != nil {
-		log.Fatalf("NewQGit err %v", err)
-	}
+// 	options := qgit.QgitOptions{
+// 		Url:    url,
+// 		Path:   directory,
+// 		IsBare: false,
+// 		Token:  token,
+// 	}
+// 	var repo qgit.GitRepository = &qgit.GitRepo{Option: &options}
+// 	// Handle error from NewQGit
+// 	qGit, err := qgit.NewQGit(&options, repo)
+// 	if err != nil {
+// 		log.Fatalf("NewQGit err %v", err)
+// 	}
 
-	files, err := qGit.GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber)
+// 	files, err := qGit.GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber)
 
-	fmt.Printf("GetChangedFilesByPRNumberFilesEndingWithYAML FILES: %s\n", files)
+// 	fmt.Printf("GetChangedFilesByPRNumberFilesEndingWithYAML FILES: %s\n", files)
 
-	if err != nil {
-		log.Fatalf("GetChangedFilesByPRNumberFilesEndingWithYAML err %v", err)
-	}
+// 	if err != nil {
+// 		log.Fatalf("GetChangedFilesByPRNumberFilesEndingWithYAML err %v", err)
+// 	}
 
-	// Ensure only one file was changed
-	if len(files) > 1 {
-		log.Fatalf("More than one file was changed")
-	}
+// 	// Ensure only one file was changed
+// 	if len(files) > 1 {
+// 		log.Fatalf("More than one file was changed")
+// 	}
 
-	file := files[0]
-	fmt.Printf("CHANGED FILES: %s\n", file)
-	fmt.Printf("FILE: %s\n", file)
+// 	file := files[0]
+// 	fmt.Printf("CHANGED FILES: %s\n", file)
+// 	fmt.Printf("FILE: %s\n", file)
 
-	// Ensure the file is a conf.yaml file
-	if !strings.Contains(file, "components/") || !strings.HasSuffix(file, "conf.yaml") {
-		log.Fatalf("The file is not a conf.yaml file")
-	}
+// 	// Ensure the file is a conf.yaml file
+// 	if !strings.Contains(file, "components/") || !strings.HasSuffix(file, "conf.yaml") {
+// 		log.Fatalf("The file is not a conf.yaml file")
+// 	}
 
-	// Extract COMPONENT and ENVIRONMENT
-	component := strings.Split(file, "/")[1]
-	environment := strings.Split(file, "/")[2]
-	needDeployment := false
+// 	// Extract COMPONENT and ENVIRONMENT
+// 	component := strings.Split(file, "/")[1]
+// 	environment := strings.Split(file, "/")[2]
+// 	needDeployment := false
 
-	configLoader := &deploycheck.FileConfigLoader{} // FileConfigLoader for loading the config
+// 	// Use OutputWriter to handle the output to GitHub
+// 	outputWriter := qgit.NewFileOutputWriter(outputFile)
 
-	checker := deploycheck.NewVersionChecker(qGit.Repo)
+// 	var version, heoRevision string
+// 	if action == "closed" && prMerged == "true" {
+// 		fmt.Println("PR is merged...")
+// 		configData, err := deploycheck.GetConf(qGit.Repo, file, "refs/heads/main")
+// 		fmt.Printf("configData: %v\n", configData)
+// 		if err != nil {
+// 			log.Fatalf("Failed to get version and heoRevision: %v", err)
+// 		}
+// 		version = configData.Version
+// 		heoRevision = configData.HeoRevision
+// 	} else {
+// 		fmt.Println("PR is NOT merged...")
 
-	// Use OutputWriter to handle the output to GitHub
-	outputWriter := qgit.NewFileOutputWriter(outputFile)
+// 		source, destination, err := deploycheck.GetSourceAndDestimationConf(qGit.Repo, file, prNumber, "main")
 
-	var version, heoRevision string
-	if action == "closed" && prMerged == "true" {
-		fmt.Println("PR is merged...")
-		version, heoRevision, err = checker.GetVersionAndHeoRevision("refs/heads/main", file)
-		if err != nil {
-			log.Fatalf("Failed to get version and heoRevision: %v", err)
-		}
-	} else {
-		fmt.Println("PR is NOT merged...")
-		changed, err := deploycheck.CheckVersionAndHeoRevisionDiff(qGit.Repo, configLoader, file)
-		if err != nil {
-			log.Fatalf("Error checking version and heoRevision: %v", err)
-		}
+// 		if err != nil {
+// 			log.Fatalf("Error checking version and heoRevision: %v", err)
+// 		}
 
-		needDeployment = changed
+// 		fmt.Printf("\nsource: %v\n", source.Version)
+// 		fmt.Printf("destination: %v\n", destination.Version)
 
-		// Fetch current config for the remaining fields
-		currentConfig, err := deploycheck.GetCurrentConfig(file)
-		if err != nil {
-			log.Fatalf("Failed to get current config: %v", err)
-		}
+// 		needDeployment = source.Version != destination.Version || source.HeoRevision != destination.HeoRevision
 
-		// Fetch previous config for comparison
-		previousConfigContent, err := qGit.Repo.GetFileContentFromBranch("refs/remotes/origin/main", file)
-		if err != nil {
-			log.Fatalf("Failed to get previous config: %v", err)
-		}
+// 		version = source.Version
+// 		heoRevision = source.HeoRevision
 
-		var previousConfig deploycheck.Config
-		err = yaml.Unmarshal([]byte(previousConfigContent), &previousConfig)
-		if err != nil {
-			log.Fatalf("Failed to parse previous YAML: %v", err)
-		}
+// 		// Compare non-version and non-heoRevision fields
+// 		jsonCurrentOtherFields := deploycheck.RemoveVersionAndHeoRevision(source)
+// 		jsonPreviousOtherFields := deploycheck.RemoveVersionAndHeoRevision(destination)
 
-		version = currentConfig.Version
-		heoRevision = currentConfig.HeoRevision
+// 		fmt.Printf("+version: %s\n", version)
+// 		fmt.Printf("jsonCurrentOtherFields: %s\n", jsonCurrentOtherFields)
+// 		fmt.Printf("jsonPreviousOtherFields: %s\n", jsonPreviousOtherFields)
 
-		// Compare non-version and non-heoRevision fields
-		jsonCurrentOtherFields := deploycheck.RemoveVersionAndHeoRevision(currentConfig)
-		jsonPreviousOtherFields := deploycheck.RemoveVersionAndHeoRevision(&previousConfig)
+// 	}
 
-		fmt.Printf("+version: %s\n", version)
-		fmt.Printf("jsonCurrentOtherFields: %s\n", jsonCurrentOtherFields)
-		fmt.Printf("jsonPreviousOtherFields: %s\n", jsonPreviousOtherFields)
+// 	// Determine if it is a release version
+// 	isRelease := "true"
+// 	if strings.Contains(version, "-") {
+// 		isRelease = "false"
+// 	}
 
-	}
+// 	// Write outputs to the GITHUB_OUTPUT file
+// 	outputWriter.WriteOutput("COMPONENT", component)
+// 	outputWriter.WriteOutput("ENVIRONMENT", environment)
+// 	outputWriter.WriteOutput("VERSION", version)
+// 	outputWriter.WriteOutput("IS_RELEASE", isRelease)
+// 	outputWriter.WriteOutput("HEO_REVISION", heoRevision)
+// 	outputWriter.WriteOutput("DEPLOYMENT_NEEDED", fmt.Sprintf("%t", needDeployment))
 
-	// Determine if it is a release version
-	isRelease := "true"
-	if strings.Contains(version, "-") {
-		isRelease = "false"
-	}
-
-	// Write outputs to the GITHUB_OUTPUT file
-	outputWriter.WriteOutput("COMPONENT", component)
-	outputWriter.WriteOutput("ENVIRONMENT", environment)
-	outputWriter.WriteOutput("VERSION", version)
-	outputWriter.WriteOutput("IS_RELEASE", isRelease)
-	outputWriter.WriteOutput("HEO_REVISION", heoRevision)
-	outputWriter.WriteOutput("DEPLOYMENT_NEEDED", fmt.Sprintf("%t", needDeployment))
-
-	fmt.Printf("COMPONENT=%s\n", component)
-	fmt.Printf("ENVIRONMENT=%s\n", environment)
-	fmt.Printf("VERSION=%s\n", version)
-	fmt.Printf("IS_RELEASE=%s\n", isRelease)
-	fmt.Printf("HEO_REVISION=%s\n", heoRevision)
-	fmt.Printf("DEPLOYMENT_NEEDED=%s\n", fmt.Sprintf("%t", needDeployment))
-}
+// 	fmt.Printf("COMPONENT=%s\n", component)
+// 	fmt.Printf("ENVIRONMENT=%s\n", environment)
+// 	fmt.Printf("VERSION=%s\n", version)
+// 	fmt.Printf("IS_RELEASE=%s\n", isRelease)
+// 	fmt.Printf("HEO_REVISION=%s\n", heoRevision)
+// 	fmt.Printf("DEPLOYMENT_NEEDED=%s\n", fmt.Sprintf("%t", needDeployment))
+// }

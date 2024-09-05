@@ -71,20 +71,64 @@ func (v *VersionChecker) GetVersionAndHeoRevision(branch, file string) (string, 
 	return config.Version, config.HeoRevision, nil
 }
 
-func CheckVersionAndHeoRevisionDiff(gitRepo qgit.GitRepository, loader ConfigLoader, file string) (bool, error) {
+func GetConf(gitRepo qgit.GitRepository, file, ref string) (configData *Config, err error) {
+	// Open previous config from origin/main
+	configContent, err := gitRepo.GetFileContentFromBranch(ref, file)
+	if err != nil {
+		return
+	}
+
+	err = yaml.Unmarshal([]byte(configContent), &configData)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func GetSourceAndDestimationConf(gitRepo qgit.GitRepository, file string, prNumber int, destimationBranch string) (currentConfig *Config, previousConfig *Config, err error) {
+	// Read current file contents
+	//fmt.Printf("CheckVersionAndHeoRevisionDiff file Path ==> %v", file)
+	prRef := fmt.Sprintf("refs/pull/%d/head", prNumber)
+	currentConfig, err = GetConf(gitRepo, file, prRef)
+	if err != nil {
+		return
+	}
+	destRef := fmt.Sprintf("refs/remotes/origin/%v", destimationBranch)
+	previousConfig, err = GetConf(gitRepo, file, destRef)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func CheckVersionAndHeoRevisionDiff(gitRepo qgit.GitRepository, file string, prNumber int, destimationBranch string) (bool, error) {
 	// Read current file contents
 	fmt.Printf("CheckVersionAndHeoRevisionDiff file Path ==> %v", file)
-	currentConfig, err := loader.LoadConfig(file)
+	prRef := fmt.Sprintf("refs/pull/%d/head", prNumber)
+
+	currentContent, err := gitRepo.GetFileContentFromBranch(prRef, file)
+
 	if err != nil {
 		fmt.Printf("CheckVersionAndHeoRevisionDiff file Path err ==> %v", err)
 		return false, err
 	}
 
-	// Open previous config from origin/main
-	previousConfigContent, err := gitRepo.GetFileContentFromBranch("refs/remotes/origin/main", file)
+	fmt.Printf("\n====currentContent ==> %v\n", currentContent)
+
+	var currentConfig Config
+	err = yaml.Unmarshal([]byte(currentContent), &currentConfig)
 	if err != nil {
 		return false, err
 	}
+
+	destRef := fmt.Sprintf("refs/remotes/origin/%v", destimationBranch)
+	// Open previous config from origin/main
+	previousConfigContent, err := gitRepo.GetFileContentFromBranch(destRef, file)
+	if err != nil {
+		return false, err
+	}
+
+	fmt.Printf("\n====previousConfigContent ==> %v\n", previousConfigContent)
 
 	var previousConfig Config
 	err = yaml.Unmarshal([]byte(previousConfigContent), &previousConfig)

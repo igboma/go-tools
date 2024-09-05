@@ -112,7 +112,6 @@ func (gr *Qgit) Setup() error {
 			return fmt.Errorf("error opening repository: %w", err)
 		}
 		fmt.Println("Repository opened successfully.")
-
 	}
 	return nil
 }
