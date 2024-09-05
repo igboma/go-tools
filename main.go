@@ -71,7 +71,12 @@ func deployChecker(directory string, url string, prNumber int) {
 	outputFile := os.Getenv("GITHUB_OUTPUT")
 	token := os.Getenv("GITHUB_TOKEN")
 	fmt.Printf("GITHUB OUTOUT %s \n", outputFile)
-	fmt.Printf("token %s \n", token)
+
+	fmt.Printf("token %v \n", token)
+
+	fmt.Printf("GITHUB directory %v \n", directory)
+	fmt.Printf("url %v \n", url)
+	fmt.Printf("prNumber %v \n", prNumber)
 
 	options := qgit.QgitOptions{
 		Url:    url,
