@@ -1,11 +1,11 @@
-package gitpkg_test
+package qgit_test
 
 import (
 	"errors"
 	"fmt"
+	"gitpkg/qgit"
+	"gitpkg/qgit/mocks"
 	"os"
-	"qgit/gitpkg"
-	"qgit/gitpkg/mocks"
 	"testing"
 	"time"
 
@@ -25,8 +25,8 @@ func (m mockFileInfo) Sys() interface{}   { return nil }
 
 func TestInit(t *testing.T) {
 	t.Run("Repository does not exist locally; cloning succeeds", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository1)
-		options := gitpkg.QgitOptions{
+		mockRepo := new(mocks.GitRepository)
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -44,7 +44,7 @@ func TestInit(t *testing.T) {
 		//mockRepo.On("Init", options).Return(nil)
 
 		// Initialize Qgit instance
-		_, err := gitpkg.NewQGit(options, mockRepo)
+		_, err := qgit.NewQGit(&options, mockRepo)
 		assert.NoError(t, err)
 
 		// Verify that methods were called
@@ -52,8 +52,8 @@ func TestInit(t *testing.T) {
 	})
 
 	t.Run("Repository exists locally; opening succeeds", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository1)
-		options := gitpkg.QgitOptions{
+		mockRepo := new(mocks.GitRepository)
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -64,7 +64,7 @@ func TestInit(t *testing.T) {
 		mockRepo.On("PlainOpen", options).Return(nil)
 
 		// Initialize Qgit instance
-		_, err := gitpkg.NewQGit(options, mockRepo)
+		_, err := qgit.NewQGit(&options, mockRepo)
 		assert.NoError(t, err)
 
 		// Verify that methods were called
@@ -72,8 +72,8 @@ func TestInit(t *testing.T) {
 	})
 
 	t.Run("Repository exists locally; opening fails", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository1)
-		options := gitpkg.QgitOptions{
+		mockRepo := new(mocks.GitRepository)
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -84,7 +84,7 @@ func TestInit(t *testing.T) {
 		mockRepo.On("PlainOpen", options).Return(errors.New("open error"))
 
 		// Initialize Qgit instance
-		_, err := gitpkg.NewQGit(options, mockRepo)
+		_, err := qgit.NewQGit(&options, mockRepo)
 		assert.Error(t, err)
 
 		// Verify that methods were called
@@ -97,8 +97,8 @@ func TestNewQGit(t *testing.T) {
 
 	t.Run("Repository does not exist locally; cloning succeeds", func(t *testing.T) {
 		// Create a new mock GitRepository using the NewGitRepository function
-		mockRepo := new(mocks.GitRepository1)
-		options := gitpkg.QgitOptions{
+		mockRepo := new(mocks.GitRepository)
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -112,7 +112,7 @@ func TestNewQGit(t *testing.T) {
 			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
 		})
 
-		_, err := gitpkg.NewQGit(options, mockRepo)
+		_, err := qgit.NewQGit(&options, mockRepo)
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
 
@@ -120,7 +120,7 @@ func TestNewQGit(t *testing.T) {
 	})
 	// t.Run("Repository does not exist locally; cloning fails", func(t *testing.T) {
 	// 	mockRepo := new(mocks.GitRepository1)
-	// 	options := gitpkg.QgitOptions{
+	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
 	// 		IsBare: false,
@@ -129,7 +129,7 @@ func TestNewQGit(t *testing.T) {
 	// 	// Simulate Init failure due to cloning error
 	// 	mockRepo.On("Init", options).Return(errors.New("cloning failed"))
 
-	// 	qgitInstance, err := gitpkg.NewQGit(options, mockRepo)
+	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
 	// 	assert.Error(t, err)
 	// 	assert.Nil(t, qgitInstance)
 	// 	mockRepo.AssertExpectations(t)
@@ -137,7 +137,7 @@ func TestNewQGit(t *testing.T) {
 
 	// t.Run("Repository exists locally; opening succeeds", func(t *testing.T) {
 	// 	mockRepo := new(mocks.GitRepository1)
-	// 	options := gitpkg.QgitOptions{
+	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
 	// 		IsBare: false,
@@ -146,7 +146,7 @@ func TestNewQGit(t *testing.T) {
 	// 	// Simulate successful Init with existing repo
 	// 	mockRepo.On("Init", options).Return(nil)
 
-	// 	qgitInstance, err := gitpkg.NewQGit(options, mockRepo)
+	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
 	// 	assert.NoError(t, err)
 	// 	assert.NotNil(t, qgitInstance)
 	// 	mockRepo.AssertExpectations(t)
@@ -154,7 +154,7 @@ func TestNewQGit(t *testing.T) {
 
 	// t.Run("Repository exists locally; opening fails", func(t *testing.T) {
 	// 	mockRepo := new(mocks.GitRepository)
-	// 	options := gitpkg.QgitOptions{
+	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
 	// 		IsBare: false,
@@ -163,7 +163,7 @@ func TestNewQGit(t *testing.T) {
 	// 	// Simulate Init failure due to open repo error
 	// 	mockRepo.On("Init", options).Return(errors.New("repository corrupted"))
 
-	// 	qgitInstance, err := gitpkg.NewQGit(options, mockRepo)
+	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
 	// 	assert.Error(t, err)
 	// 	assert.Nil(t, qgitInstance)
 	// 	mockRepo.AssertExpectations(t)
@@ -176,7 +176,7 @@ func TestCheckout(t *testing.T) {
 	// t.Run("Branch exists and is successfully checked out", func(t *testing.T) {
 	// 	mockRepo := new(mocks.GitRepository1)
 	// 	//mockWorktree := new(mocks.GitWorktree)
-	// 	options := gitpkg.QgitOptions{
+	// 	options := qgit.QgitOptions{
 	// 		Path:   "/test/repo",
 	// 		Url:    "https://github.com/test/repo.git",
 	// 		IsBare: false,
@@ -198,7 +198,7 @@ func TestCheckout(t *testing.T) {
 
 	// 	// Create the Qgit instance and perform the checkout operation
 
-	// 	qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+	// 	qgitInstance, _ := qgit.NewQGit(options, mockRepo)
 	// 	err := qgitInstance.Checkout("main")
 	// 	assert.NoError(t, err)
 
@@ -209,7 +209,7 @@ func TestCheckout(t *testing.T) {
 	t.Run("Tag exists and is successfully checked out", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		//mockWorktree := new(mocks.GitWorktree)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -227,7 +227,7 @@ func TestCheckout(t *testing.T) {
 		mockRepo.On("CheckoutTag", "v1.0.0").Return(nil)
 
 		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 		err := qgitInstance.Checkout("v1.0.0")
 		assert.NoError(t, err)
 
@@ -238,7 +238,7 @@ func TestCheckout(t *testing.T) {
 	t.Run("Commit hash exists and is successfully checked out", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
 		//mockWorktree := new(mocks.GitWorktree)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -256,7 +256,7 @@ func TestCheckout(t *testing.T) {
 		mockRepo.On("CheckoutHash", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef").Return(nil)
 
 		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 		err := qgitInstance.Checkout("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 		assert.NoError(t, err)
 
@@ -266,7 +266,7 @@ func TestCheckout(t *testing.T) {
 
 	t.Run("Reference does not exist", func(t *testing.T) {
 		mockRepo := new(mocks.GitRepository)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -283,7 +283,7 @@ func TestCheckout(t *testing.T) {
 		mockRepo.On("CheckRemoteRef", "unknown-ref").Return(false, false, false)
 
 		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 		err := qgitInstance.Checkout("unknown-ref")
 		assert.Error(t, err)
 		assert.Equal(t, "reference not found: unknown-ref", err.Error())
@@ -297,12 +297,12 @@ func TestQgit_Head(t *testing.T) {
 	t.Run("Head returns the current reference successfully", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
 		}
-		expectedRef := gitpkg.QReference{
+		expectedRef := qgit.QReference{
 			ReferenceName: "refs/heads/main",
 			Hash:          "abc123",
 		}
@@ -320,7 +320,7 @@ func TestQgit_Head(t *testing.T) {
 		mockRepo.On("Head").Return(expectedRef, nil)
 
 		// Create a Qgit instance
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		ref, err := qgitInstance.Head()
@@ -336,7 +336,7 @@ func TestQgit_Head(t *testing.T) {
 	t.Run("Head returns an error when the repository fails to get HEAD", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -351,10 +351,10 @@ func TestQgit_Head(t *testing.T) {
 		})
 
 		// Mock the Head method of the repository to return an error
-		mockRepo.On("Head").Return(gitpkg.QReference{}, expectedErr)
+		mockRepo.On("Head").Return(qgit.QReference{}, expectedErr)
 
 		// Create a Qgit instance
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		ref, err := qgitInstance.Head()
@@ -362,7 +362,7 @@ func TestQgit_Head(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Equal(t, expectedErr, err)
-		assert.Equal(t, gitpkg.QReference{}, ref)
+		assert.Equal(t, qgit.QReference{}, ref)
 
 		// Verify that the expectations were met
 		mockRepo.AssertExpectations(t)
@@ -373,7 +373,7 @@ func TestQgit_Fetch(t *testing.T) {
 	t.Run("Fetch returns no error when the fetch succeeds", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -389,7 +389,7 @@ func TestQgit_Fetch(t *testing.T) {
 		mockRepo.On("Fetch", "refs/heads/main").Return(nil)
 
 		// Create a Qgit instance
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		err := qgitInstance.Fetch("refs/heads/main")
@@ -404,7 +404,7 @@ func TestQgit_Fetch(t *testing.T) {
 	t.Run("Fetch returns an error when the fetch fails", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(mocks.GitRepository)
-		options := gitpkg.QgitOptions{
+		options := qgit.QgitOptions{
 			Path:   "/test/repo",
 			Url:    "https://github.com/test/repo.git",
 			IsBare: false,
@@ -421,7 +421,7 @@ func TestQgit_Fetch(t *testing.T) {
 		mockRepo.On("Fetch", "refs/heads/main").Return(expectedErr)
 
 		// Create a Qgit instance
-		qgitInstance, _ := gitpkg.NewQGit(options, mockRepo)
+		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		err := qgitInstance.Fetch("refs/heads/main")

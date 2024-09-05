@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	gitpkg "qgit/gitpkg"
+	"gitpkg/qgit"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -14,7 +14,7 @@ type GitWorktree struct {
 }
 
 // Checkout provides a mock function with given fields: opts
-func (_m *GitWorktree) Checkout(opts *gitpkg.QgitCheckoutOptions) error {
+func (_m *GitWorktree) Checkout(opts *qgit.QgitCheckoutOptions) error {
 	ret := _m.Called(opts)
 
 	if len(ret) == 0 {
@@ -22,7 +22,7 @@ func (_m *GitWorktree) Checkout(opts *gitpkg.QgitCheckoutOptions) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*gitpkg.QgitCheckoutOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(*qgit.QgitCheckoutOptions) error); ok {
 		r0 = rf(opts)
 	} else {
 		r0 = ret.Error(0)

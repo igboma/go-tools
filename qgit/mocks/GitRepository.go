@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	gitpkg "qgit/gitpkg"
+	qgit "gitpkg/qgit"
 	fs "io/fs"
 
 	mock "github.com/stretchr/testify/mock"
@@ -139,23 +139,139 @@ func (_m *GitRepository) Fetch(refSpecStr string) error {
 	return r0
 }
 
+// GetChangedFilesByPRNumber provides a mock function with given fields: prNumber
+func (_m *GitRepository) GetChangedFilesByPRNumber(prNumber int) ([]string, error) {
+	ret := _m.Called(prNumber)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChangedFilesByPRNumber")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) ([]string, error)); ok {
+		return rf(prNumber)
+	}
+	if rf, ok := ret.Get(0).(func(int) []string); ok {
+		r0 = rf(prNumber)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(prNumber)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetChangedFilesByPRNumberFilesEndingWithYAML provides a mock function with given fields: prNumber
+func (_m *GitRepository) GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber int) ([]string, error) {
+	ret := _m.Called(prNumber)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChangedFilesByPRNumberFilesEndingWithYAML")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) ([]string, error)); ok {
+		return rf(prNumber)
+	}
+	if rf, ok := ret.Get(0).(func(int) []string); ok {
+		r0 = rf(prNumber)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(prNumber)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetFileContentFromBranch provides a mock function with given fields: branch, file
+func (_m *GitRepository) GetFileContentFromBranch(branch string, file string) (string, error) {
+	ret := _m.Called(branch, file)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFileContentFromBranch")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string) (string, error)); ok {
+		return rf(branch, file)
+	}
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(branch, file)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(branch, file)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetFileContentFromCommit provides a mock function with given fields: commitHash, file
+func (_m *GitRepository) GetFileContentFromCommit(commitHash string, file string) (string, error) {
+	ret := _m.Called(commitHash, file)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFileContentFromCommit")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string) (string, error)); ok {
+		return rf(commitHash, file)
+	}
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(commitHash, file)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(commitHash, file)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Head provides a mock function with given fields:
-func (_m *GitRepository) Head() (gitpkg.QReference, error) {
+func (_m *GitRepository) Head() (qgit.QReference, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Head")
 	}
 
-	var r0 gitpkg.QReference
+	var r0 qgit.QReference
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (gitpkg.QReference, error)); ok {
+	if rf, ok := ret.Get(0).(func() (qgit.QReference, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() gitpkg.QReference); ok {
+	if rf, ok := ret.Get(0).(func() qgit.QReference); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(gitpkg.QReference)
+		r0 = ret.Get(0).(qgit.QReference)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -168,7 +284,7 @@ func (_m *GitRepository) Head() (gitpkg.QReference, error) {
 }
 
 // PlainClone provides a mock function with given fields: o
-func (_m *GitRepository) PlainClone(o gitpkg.QgitOptions) error {
+func (_m *GitRepository) PlainClone(o qgit.QgitOptions) error {
 	ret := _m.Called(o)
 
 	if len(ret) == 0 {
@@ -176,7 +292,7 @@ func (_m *GitRepository) PlainClone(o gitpkg.QgitOptions) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(gitpkg.QgitOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(qgit.QgitOptions) error); ok {
 		r0 = rf(o)
 	} else {
 		r0 = ret.Error(0)
@@ -186,7 +302,7 @@ func (_m *GitRepository) PlainClone(o gitpkg.QgitOptions) error {
 }
 
 // PlainOpen provides a mock function with given fields: o
-func (_m *GitRepository) PlainOpen(o gitpkg.QgitOptions) error {
+func (_m *GitRepository) PlainOpen(o qgit.QgitOptions) error {
 	ret := _m.Called(o)
 
 	if len(ret) == 0 {
@@ -194,7 +310,7 @@ func (_m *GitRepository) PlainOpen(o gitpkg.QgitOptions) error {
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(gitpkg.QgitOptions) error); ok {
+	if rf, ok := ret.Get(0).(func(qgit.QgitOptions) error); ok {
 		r0 = rf(o)
 	} else {
 		r0 = ret.Error(0)
@@ -234,23 +350,23 @@ func (_m *GitRepository) Stat(path string) (fs.FileInfo, error) {
 }
 
 // Worktree provides a mock function with given fields:
-func (_m *GitRepository) Worktree() (gitpkg.GitWorktree, error) {
+func (_m *GitRepository) Worktree() (qgit.GitWorktree, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Worktree")
 	}
 
-	var r0 gitpkg.GitWorktree
+	var r0 qgit.GitWorktree
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (gitpkg.GitWorktree, error)); ok {
+	if rf, ok := ret.Get(0).(func() (qgit.GitWorktree, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() gitpkg.GitWorktree); ok {
+	if rf, ok := ret.Get(0).(func() qgit.GitWorktree); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(gitpkg.GitWorktree)
+			r0 = ret.Get(0).(qgit.GitWorktree)
 		}
 	}
 

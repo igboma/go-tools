@@ -3,12 +3,9 @@ package deploycheck
 import (
 	"encoding/json"
 	"fmt"
+	"gitpkg/qgit"
 	"io/ioutil"
-	"log"
-	"os"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"gopkg.in/yaml.v2"
 )
@@ -31,19 +28,19 @@ type Config struct {
 }
 
 // GitRepository interface to abstract git repository operations
-type GitRepository interface {
-	GetFileContentFromBranch(branch, file string) (string, error)
-	GetFileContentFromCommit(commitHash, file string) (string, error)
-}
+// type GitRepository interface {
+// 	GetFileContentFromBranch(branch, file string) (string, error)
+// 	GetFileContentFromCommit(commitHash, file string) (string, error)
+// }
 
-// GitRepositoryImpl is the actual implementation using go-git
-type GitRepositoryImpl struct {
-	repo *git.Repository
-}
+// // GitRepositoryImpl is the actual implementation using go-git
+// type GitRepositoryImpl struct {
+// 	repo *git.Repository
+// }
 
-func NewGitRepository(repo *git.Repository) *GitRepositoryImpl {
-	return &GitRepositoryImpl{repo: repo}
-}
+// func NewGitRepository(repo *git.Repository) *GitRepositoryImpl {
+// 	return &GitRepositoryImpl{repo: repo}
+// }
 
 // ConfigLoader interface
 type ConfigLoader interface {
@@ -66,60 +63,35 @@ func (f *FileConfigLoader) LoadConfig(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-type OutputWriter interface {
-	WriteOutput(key, value string) error
-}
+// func (g *GitRepositoryImpl) GetFileContentFromBranch(branch, file string) (string, error) {
+// 	ref, err := g.repo.Reference(plumbing.ReferenceName(branch), true)
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-type FileOutputWriter struct {
-	file string
-}
+// 	commit, err := g.repo.CommitObject(ref.Hash())
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-func NewFileOutputWriter(file string) *FileOutputWriter {
-	return &FileOutputWriter{file: file}
-}
+// 	return GetFileContentFromCommit(commit, file)
+// }
 
-func (f *FileOutputWriter) WriteOutput(key, value string) error {
-	outFile, err := os.OpenFile(f.file, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
+// func (g *GitRepositoryImpl) GetFileContentFromCommit(commitHash, file string) (string, error) {
+// 	commit, err := g.repo.CommitObject(plumbing.NewHash(commitHash))
+// 	if err != nil {
+// 		return "", err
+// 	}
 
-	if _, err := outFile.WriteString(fmt.Sprintf("%s=%s\n", key, value)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (g *GitRepositoryImpl) GetFileContentFromBranch(branch, file string) (string, error) {
-	ref, err := g.repo.Reference(plumbing.ReferenceName(branch), true)
-	if err != nil {
-		return "", err
-	}
-
-	commit, err := g.repo.CommitObject(ref.Hash())
-	if err != nil {
-		return "", err
-	}
-
-	return GetFileContentFromCommit(commit, file)
-}
-
-func (g *GitRepositoryImpl) GetFileContentFromCommit(commitHash, file string) (string, error) {
-	commit, err := g.repo.CommitObject(plumbing.NewHash(commitHash))
-	if err != nil {
-		return "", err
-	}
-
-	return GetFileContentFromCommit(commit, file)
-}
+// 	return GetFileContentFromCommit(commit, file)
+// }
 
 // VersionChecker struct that uses GitRepository to check versions and revisions
 type VersionChecker struct {
-	repo GitRepository
+	repo qgit.GitRepository
 }
 
-func NewVersionChecker(repo GitRepository) *VersionChecker {
+func NewVersionChecker(repo qgit.GitRepository) *VersionChecker {
 	return &VersionChecker{repo: repo}
 }
 
@@ -137,7 +109,7 @@ func (v *VersionChecker) GetVersionAndHeoRevision(branch, file string) (string, 
 	return config.Version, config.HeoRevision, nil
 }
 
-func CheckVersionAndHeoRevisionDiff(gitRepo GitRepository, loader ConfigLoader, file string) (bool, error) {
+func CheckVersionAndHeoRevisionDiff(gitRepo qgit.GitRepository, loader ConfigLoader, file string) (bool, error) {
 	// Read current file contents
 	currentConfig, err := loader.LoadConfig(file)
 	if err != nil {
@@ -199,18 +171,6 @@ func GetCurrentConfig(file string) (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-func WriteOutput(outputFile, key, value string) {
-	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		log.Fatalf("Failed to open GITHUB_OUTPUT: %v", err)
-	}
-	defer f.Close()
-
-	if _, err = f.WriteString(fmt.Sprintf("%s=%s\n", key, value)); err != nil {
-		log.Fatalf("Failed to write output: %v", err)
-	}
 }
 
 func RemoveVersionAndHeoRevision(config *Config) string {

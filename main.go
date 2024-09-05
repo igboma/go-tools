@@ -1,35 +1,99 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"qgit/deploycheck"
+	"gitpkg/deploycheck"
+	"gitpkg/qgit"
 
-	"github.com/go-git/go-git/v5"
 	"gopkg.in/yaml.v2"
 )
 
-// Main logic
 func main() {
-	// Check if the repository path is passed as a command-line argument
-	if len(os.Args) < 2 {
-		log.Fatalf("Usage: go-tools <repo-path>")
+	// if len(os.Args) < 4 {
+	// 	fmt.Println("Usage: <url> <directory> <ref>")
+	// 	os.Exit(1)
+	// }
+	// url, directory, ref := os.Args[1], os.Args[2], os.Args[3]
+
+	// token := os.Getenv("GITHUB_TOKEN")
+	// fmt.Printf("token value %v \n", token)
+
+	// qgit.Runner(url, directory, ref, token)
+
+	//go run main.go https://github.com/igboma/cd-pipeline /Users/rza/workspace/helprepo/cd-pipeline  main
+	//go run main.go https://github.com/qlik-trial/helm-environment-overrides /Users/rza/workspace/helprepo/override  main
+	//https://github.com/qlik-trial/helm-environment-overrides
+
+	var workspace string
+	var prNumber int
+	var gitURL string
+
+	// Bind the flags to variables
+	flag.StringVar(&workspace, "workspace", "", "The GitHub workspace")
+	flag.IntVar(&prNumber, "pr-number", 0, "The Pull Request number")
+	flag.StringVar(&gitURL, "git-url", "", "The Git URL of the PR")
+
+	// Parse the command-line flags
+	flag.Parse()
+
+	// Check if required flags are passed
+	if workspace == "" || gitURL == "" || prNumber == 0 {
+		fmt.Println("Missing required flags: --workspace, --pr-number, and --git-url must all be provided.")
+		return
 	}
 
-	repoPath := os.Args[1]
+	// Use the flag values in your program
+	fmt.Printf("Workspace: %s\n", workspace)
+	fmt.Printf("PR Number: %d\n", prNumber)
+	fmt.Printf("Git URL: %s\n", gitURL)
+
+	deployChecker(workspace, gitURL, prNumber)
+}
+
+// Main logic
+func deployChecker(directory string, url string, prNumber int) {
+	// Check if the repository path is passed as a command-line argument
+	// if len(os.Args) < 2 {
+	// 	log.Fatalf("Usage: go-tools <repo-path>")
+	// }
+
+	//repoPath := os.Args[1]
 
 	// Retrieve environment variables (set in GitHub Actions)
-	changedFiles := os.Getenv("CHANGED_FILES")
+	//changedFiles := os.Getenv("CHANGED_FILES")
 	action := os.Getenv("GITHUB_EVENT_ACTION")
 	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
 	outputFile := os.Getenv("GITHUB_OUTPUT")
+	token := os.Getenv("GITHUB_TOKEN")
 	fmt.Printf("GITHUB OUTOUT %s \n", outputFile)
+	fmt.Printf("token %s \n", token)
+
+	options := qgit.QgitOptions{
+		Url:    url,
+		Path:   directory,
+		IsBare: false,
+		Token:  token,
+	}
+	var repo qgit.GitRepository = &qgit.GitRepo{Option: &options}
+	// Handle error from NewQGit
+	qGit, err := qgit.NewQGit(&options, repo)
+	if err != nil {
+		log.Fatalf("NewQGit err %v", err)
+	}
+
+	files, err := qGit.GetChangedFilesByPRNumberFilesEndingWithYAML(prNumber)
+
+	if err != nil {
+		log.Fatalf("GetChangedFilesByPRNumberFilesEndingWithYAML err %v", err)
+	}
 
 	// Split the changed files into an array
-	files := strings.Split(changedFiles, "\n")
+	//files := strings.Split(changedFiles, "\n")
 
 	// Ensure only one file was changed
 	if len(files) > 1 {
@@ -50,20 +114,20 @@ func main() {
 	environment := strings.Split(file, "/")[2]
 	needDeployment := false
 
-	// Open the repository
-	r, err := git.PlainOpen(repoPath)
-	if err != nil {
-		log.Fatalf("Failed to open repository at %s: %v", repoPath, err)
-	}
+	// // Open the repository
+	// _, err := git.PlainOpen(directory)
+	// if err != nil {
+	// 	log.Fatalf("Failed to open repository at %s: %v", directory, err)
+	// }
 
 	// Create GitRepository and ConfigLoader instances
-	gitRepo := deploycheck.NewGitRepository(r)
+	//gitRepo := deploycheck.NewGitRepository(r)
 	configLoader := &deploycheck.FileConfigLoader{} // FileConfigLoader for loading the config
 
-	checker := deploycheck.NewVersionChecker(gitRepo)
+	checker := deploycheck.NewVersionChecker(qGit.Repo)
 
 	// Use OutputWriter to handle the output to GitHub
-	outputWriter := deploycheck.NewFileOutputWriter(outputFile)
+	outputWriter := qgit.NewFileOutputWriter(outputFile)
 
 	var version, heoRevision string
 	if action == "closed" && prMerged == "true" {
@@ -74,8 +138,7 @@ func main() {
 		}
 	} else {
 		fmt.Println("PR is NOT merged...")
-
-		changed, err := deploycheck.CheckVersionAndHeoRevisionDiff(gitRepo, configLoader, file)
+		changed, err := deploycheck.CheckVersionAndHeoRevisionDiff(qGit.Repo, configLoader, file)
 		if err != nil {
 			log.Fatalf("Error checking version and heoRevision: %v", err)
 		}
@@ -89,7 +152,7 @@ func main() {
 		}
 
 		// Fetch previous config for comparison
-		previousConfigContent, err := gitRepo.GetFileContentFromBranch("refs/remotes/origin/main", file)
+		previousConfigContent, err := qGit.Repo.GetFileContentFromBranch("refs/remotes/origin/main", file)
 		if err != nil {
 			log.Fatalf("Failed to get previous config: %v", err)
 		}
