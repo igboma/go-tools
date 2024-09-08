@@ -3,294 +3,20 @@ package qgit_test
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"testing"
+
 	"gitpkg/qgit"
 	"gitpkg/qgit/mocks"
-	"os"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-// mockFileInfo implements os.FileInfo interface for testing purposes.
-type mockFileInfo struct{}
-
-func (m mockFileInfo) Name() string       { return "mock" }
-func (m mockFileInfo) Size() int64        { return 0 }
-func (m mockFileInfo) Mode() os.FileMode  { return 0 }
-func (m mockFileInfo) ModTime() time.Time { return time.Now() }
-func (m mockFileInfo) IsDir() bool        { return true }
-func (m mockFileInfo) Sys() interface{}   { return nil }
-
-func TestInit(t *testing.T) {
-	t.Run("Repository does not exist locally; cloning succeeds", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Mock the Stat and PlainClone methods
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-
-		// Also mock the Init method
-		//mockRepo.On("Init", options).Return(nil)
-
-		// Initialize Qgit instance
-		_, err := qgit.NewQGit(&options, mockRepo)
-		assert.NoError(t, err)
-
-		// Verify that methods were called
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("Repository exists locally; opening succeeds", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Mock Stat and PlainOpen methods
-		mockRepo.On("Stat", "/test/repo/.git").Return(&mockFileInfo{}, nil)
-		mockRepo.On("PlainOpen", options).Return(nil)
-
-		// Initialize Qgit instance
-		_, err := qgit.NewQGit(&options, mockRepo)
-		assert.NoError(t, err)
-
-		// Verify that methods were called
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("Repository exists locally; opening fails", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Mock Stat and PlainOpen methods
-		mockRepo.On("Stat", "/test/repo/.git").Return(&mockFileInfo{}, nil)
-		mockRepo.On("PlainOpen", options).Return(errors.New("open error"))
-
-		// Initialize Qgit instance
-		_, err := qgit.NewQGit(&options, mockRepo)
-		assert.Error(t, err)
-
-		// Verify that methods were called
-		mockRepo.AssertExpectations(t)
-	})
-}
-
-// TestNewQGit tests the initialization logic.
-func TestNewQGit(t *testing.T) {
-
-	t.Run("Repository does not exist locally; cloning succeeds", func(t *testing.T) {
-		// Create a new mock GitRepository using the NewGitRepository function
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Mock the Stat, PlainClone, and PlainOpen methods
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-
-		_, err := qgit.NewQGit(&options, mockRepo)
-		assert.NoError(t, err)
-		mockRepo.AssertExpectations(t)
-
-		// Expectations will be asserted automatically in the Cleanup function registered by NewGitRepository
-	})
-	// t.Run("Repository does not exist locally; cloning fails", func(t *testing.T) {
-	// 	mockRepo := new(mocks.GitRepository1)
-	// 	options := qgit.QgitOptions{
-	// 		Path:   "/test/repo",
-	// 		Url:    "https://github.com/test/repo.git",
-	//
-	// 	}
-
-	// 	// Simulate Init failure due to cloning error
-	// 	mockRepo.On("Init", options).Return(errors.New("cloning failed"))
-
-	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
-	// 	assert.Error(t, err)
-	// 	assert.Nil(t, qgitInstance)
-	// 	mockRepo.AssertExpectations(t)
-	// })
-
-	// t.Run("Repository exists locally; opening succeeds", func(t *testing.T) {
-	// 	mockRepo := new(mocks.GitRepository1)
-	// 	options := qgit.QgitOptions{
-	// 		Path:   "/test/repo",
-	// 		Url:    "https://github.com/test/repo.git",
-	//
-	// 	}
-
-	// 	// Simulate successful Init with existing repo
-	// 	mockRepo.On("Init", options).Return(nil)
-
-	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
-	// 	assert.NoError(t, err)
-	// 	assert.NotNil(t, qgitInstance)
-	// 	mockRepo.AssertExpectations(t)
-	// })
-
-	// t.Run("Repository exists locally; opening fails", func(t *testing.T) {
-	// 	mockRepo := new(mocks.GitRepository)
-	// 	options := qgit.QgitOptions{
-	// 		Path:   "/test/repo",
-	// 		Url:    "https://github.com/test/repo.git",
-	//
-	// 	}
-
-	// 	// Simulate Init failure due to open repo error
-	// 	mockRepo.On("Init", options).Return(errors.New("repository corrupted"))
-
-	// 	qgitInstance, err := qgit.NewQGit(options, mockRepo)
-	// 	assert.Error(t, err)
-	// 	assert.Nil(t, qgitInstance)
-	// 	mockRepo.AssertExpectations(t)
-	// })
-
-}
-
-// TestCheckout tests the checkout logic for branches, tags, and commits.
-func TestCheckout(t *testing.T) {
-	// t.Run("Branch exists and is successfully checked out", func(t *testing.T) {
-	// 	mockRepo := new(mocks.GitRepository1)
-	// 	//mockWorktree := new(mocks.GitWorktree)
-	// 	options := qgit.QgitOptions{
-	// 		Path:   "/test/repo",
-	// 		Url:    "https://github.com/test/repo.git",
-	//
-	// 	}
-
-	// 	// mockRepo.On("Checkout", "main").Return(nil).Run(func(args mock.Arguments) {
-	// 	// 	fmt.Printf("Checkout called:\n")
-	// 	// })
-	// 	// Simulate Init and CheckRemoteRef finding a branch
-	// 	mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-	// 		fmt.Println("Stat called: /test/repo/.git does not exist")
-	// 	})
-	// 	mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-	// 		fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-	// 	})
-
-	// 	mockRepo.On("CheckRemoteRef", "main").Return(true, false, false)
-	// 	mockRepo.On("CheckoutBranch", "main").Return(nil)
-
-	// 	// Create the Qgit instance and perform the checkout operation
-
-	// 	qgitInstance, _ := qgit.NewQGit(options, mockRepo)
-	// 	err := qgitInstance.Checkout("main")
-	// 	assert.NoError(t, err)
-
-	// 	// Verify that the methods were called with the correct arguments
-	// 	mockRepo.AssertExpectations(t)
-	// })
-
-	t.Run("Tag exists and is successfully checked out", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		//mockWorktree := new(mocks.GitWorktree)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Simulate Init and CheckRemoteRef finding a tag
-		//mockRepo.On("Init", options).Return(nil)
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-		mockRepo.On("CheckRemoteRef", "v1.0.0").Return(false, true, false)
-		mockRepo.On("CheckoutTag", "v1.0.0").Return(nil)
-
-		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
-		err := qgitInstance.Checkout("v1.0.0")
-		assert.NoError(t, err)
-
-		// Verify that the methods were called with the correct arguments
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("Commit hash exists and is successfully checked out", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		//mockWorktree := new(mocks.GitWorktree)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Simulate Init and CheckRemoteRef finding a commit hash
-		//mockRepo.On("Init", options).Return(nil)
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-		mockRepo.On("CheckRemoteRef", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef").Return(false, false, true)
-		mockRepo.On("CheckoutHash", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef").Return(nil)
-
-		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
-		err := qgitInstance.Checkout("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-		assert.NoError(t, err)
-
-		// Verify that the methods were called with the correct arguments
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("Reference does not exist", func(t *testing.T) {
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
-			Path: "/test/repo",
-			Url:  "https://github.com/test/repo.git",
-		}
-
-		// Simulate Init and CheckRemoteRef failing to find the reference
-		//mockRepo.On("Init", options).Return(nil)
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-		mockRepo.On("CheckRemoteRef", "unknown-ref").Return(false, false, false)
-
-		// Create the Qgit instance and perform the checkout operation
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
-		err := qgitInstance.Checkout("unknown-ref")
-		assert.Error(t, err)
-		assert.Equal(t, "reference not found: unknown-ref", err.Error())
-
-		// Verify that the methods were called with the correct arguments
-		mockRepo.AssertExpectations(t)
-	})
-}
 
 func TestQgit_Head(t *testing.T) {
 	t.Run("Head returns the current reference successfully", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
 			Path: "/test/repo",
 			Url:  "https://github.com/test/repo.git",
 		}
@@ -299,20 +25,11 @@ func TestQgit_Head(t *testing.T) {
 			Hash:          "abc123",
 		}
 
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-		// mockRepo.On("CheckRemoteRef", "main").Return(true, false, false)
-		// mockRepo.On("CheckoutBranch", "main").Return(nil)
-
 		// Mock the Head method of the repository
 		mockRepo.On("Head").Return(expectedRef, nil)
 
 		// Create a Qgit instance
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		ref, err := qgitInstance.Head()
@@ -327,25 +44,18 @@ func TestQgit_Head(t *testing.T) {
 
 	t.Run("Head returns an error when the repository fails to get HEAD", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
 			Path: "/test/repo",
 			Url:  "https://github.com/test/repo.git",
 		}
 		expectedErr := errors.New("failed to get HEAD")
 
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
-
 		// Mock the Head method of the repository to return an error
 		mockRepo.On("Head").Return(qgit.QReference{}, expectedErr)
 
 		// Create a Qgit instance
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		ref, err := qgitInstance.Head()
@@ -363,23 +73,17 @@ func TestQgit_Head(t *testing.T) {
 func TestQgit_Fetch(t *testing.T) {
 	t.Run("Fetch returns no error when the fetch succeeds", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
 			Path: "/test/repo",
 			Url:  "https://github.com/test/repo.git",
 		}
 
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
 		// Mock the Fetch method of the repository
 		mockRepo.On("Fetch", "refs/heads/main").Return(nil)
 
 		// Create a Qgit instance
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		err := qgitInstance.Fetch("refs/heads/main")
@@ -393,24 +97,18 @@ func TestQgit_Fetch(t *testing.T) {
 
 	t.Run("Fetch returns an error when the fetch fails", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.GitRepository)
-		options := qgit.QgitOptions{
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
 			Path: "/test/repo",
 			Url:  "https://github.com/test/repo.git",
 		}
 		expectedErr := errors.New("network error")
 
-		mockRepo.On("Stat", "/test/repo/.git").Return(nil, os.ErrNotExist).Run(func(args mock.Arguments) {
-			fmt.Println("Stat called: /test/repo/.git does not exist")
-		})
-		mockRepo.On("PlainClone", options).Return(nil).Run(func(args mock.Arguments) {
-			fmt.Printf("PlainClone called: Cloning repository with options: %+v\n", options)
-		})
 		// Mock the Fetch method of the repository to return an error
 		mockRepo.On("Fetch", "refs/heads/main").Return(expectedErr)
 
 		// Create a Qgit instance
-		qgitInstance, _ := qgit.NewQGit(&options, mockRepo)
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
 
 		// Act
 		err := qgitInstance.Fetch("refs/heads/main")
@@ -420,6 +118,605 @@ func TestQgit_Fetch(t *testing.T) {
 		assert.Equal(t, expectedErr, err)
 
 		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetChangedFilesByPRNumber(t *testing.T) {
+	t.Run("GetChangedFilesByPRNumber returns files when the repository fetch succeeds", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		expectedFiles := []string{"file1.txt", "file2.txt"}
+
+		// Mock the GetChangedFilesByPRNumber method of the repository
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(expectedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		files, err := qgitInstance.GetChangedFilesByPRNumber(prNumber)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedFiles, files)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumber returns an error when the repository fetch fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		expectedErr := errors.New("repository error")
+
+		// Mock the GetChangedFilesByPRNumber method of the repository to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		files, err := qgitInstance.GetChangedFilesByPRNumber(prNumber)
+
+		// Assert
+		assert.Error(t, err)
+		assert.Nil(t, files)
+		assert.Equal(t, expectedErr, err)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetChangedFilesByPRNumberFileExtMatch(t *testing.T) {
+	t.Run("GetChangedFilesByPRNumberFileExtMatch returns matching files based on file extension", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "file2.json", "file3.yaml", "README.md"}
+		expectedMatchingFiles := []string{"file1.yaml", "file3.yaml"}
+
+		fileExt := ".yaml" // The file extension to match
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFileExtMatch(prNumber, fileExt)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedMatchingFiles, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFileExtMatch returns no files when no match is found", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "file2.json", "file3.yaml"}
+		fileExt := ".md" // File extension that does not match any files
+		//expectedMatchingFiles := []string{} // No matching files
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFileExtMatch(prNumber, fileExt)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Empty(t, matchingFiles) // Use assert.Empty to handle both nil and empty slice
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFileExtMatch returns an error when GetChangedFilesByPRNumber fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		fileExt := ".yaml"
+		expectedErr := errors.New("failed to fetch changed files")
+
+		// Mock the GetChangedFilesByPRNumber method to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFileExtMatch(prNumber, fileExt)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		assert.Nil(t, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetChangedFilesByPRNumberFilesMatching(t *testing.T) {
+	t.Run("GetChangedFilesByPRNumberFilesMatching returns matching files successfully", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "config/file2.yaml", "docs/file3.yaml", "README.md"}
+		expectedMatchingFiles := []string{"config/file2.yaml"}
+
+		fileName := "file2.yaml" // The filename to match
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesMatching(prNumber, fileName)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedMatchingFiles, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFilesMatching returns no files when no match is found", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "config/file2.yaml", "docs/file3.yaml"}
+
+		fileName := "nonexistent.yaml" // The filename that does not exist in the list
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesMatching(prNumber, fileName)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Empty(t, matchingFiles) // Use assert.Empty to handle both nil and empty slice
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFilesMatching returns an error when GetChangedFilesByPRNumber fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		fileName := "file2.yaml" // The filename to match
+		expectedErr := errors.New("failed to fetch changed files")
+
+		// Mock the GetChangedFilesByPRNumber method to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesMatching(prNumber, fileName)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		assert.Nil(t, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetChangedFilesByPRNumberFilesByRegex(t *testing.T) {
+	t.Run("GetChangedFilesByPRNumberFilesByRegex returns filtered files successfully based on regex", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "file2.json", "docs/file3.yaml", "README.md"}
+		expectedFilteredFiles := []string{"docs/file3.yaml"}
+
+		// Regex to match files that are inside the "docs" folder
+		regexFilter := `^docs/.*\.yaml$`
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		filteredFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesByRegex(prNumber, regexFilter)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedFilteredFiles, filteredFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFilesByRegex returns an error when regex compilation fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "file2.json", "docs/file3.yaml"}
+		invalidRegex := `[` // Invalid regex pattern
+		//expectedErr := errors.New("failed to compile regex filter")
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		filteredFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesByRegex(prNumber, invalidRegex)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Contains(t, err.Error(), "failed to compile regex filter")
+		assert.Nil(t, filteredFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFilesByRegex returns an error when GetChangedFilesByPRNumber fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		expectedErr := errors.New("failed to fetch changed files")
+		validRegex := `.*\.yaml$` // Valid regex
+
+		// Mock the GetChangedFilesByPRNumber method to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		filteredFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesByRegex(prNumber, validRegex)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		assert.Nil(t, filteredFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetChangedFilesByPRNumberFilesByFilter(t *testing.T) {
+	t.Run("GetChangedFilesByPRNumberFilesByFilter returns filtered files successfully", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"file1.yaml", "file2.json", "file3.yaml"}
+		expectedFilteredFiles := []string{"file1.yaml", "file3.yaml"}
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		filteredFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesByFilter(prNumber, func(file string) bool {
+			return strings.HasSuffix(file, ".yaml") // Only return files ending with .yaml
+		})
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedFilteredFiles, filteredFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetChangedFilesByPRNumberFilesByFilter returns an error when GetChangedFilesByPRNumber fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		expectedErr := errors.New("failed to fetch changed files")
+
+		// Mock the GetChangedFilesByPRNumber method to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		filteredFiles, err := qgitInstance.GetChangedFilesByPRNumberFilesByFilter(prNumber, func(file string) bool {
+			return strings.HasSuffix(file, ".yaml")
+		})
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		assert.Nil(t, filteredFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_GetConfFileChangedByPRNumber(t *testing.T) {
+	t.Run("GetConfFileChangedByPRNumber returns matching YAML files", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"config/conf.yaml", "docs/readme.md", "src/conf.yaml"}
+		expectedMatchingFiles := []string{"config/conf.yaml", "src/conf.yaml"}
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetConfFileChangedByPRNumber(prNumber)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Equal(t, expectedMatchingFiles, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetConfFileChangedByPRNumber returns no files when no YAML files are found", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		changedFiles := []string{"docs/readme.md", "src/app.json"}
+
+		// Mock the GetChangedFilesByPRNumber method to return the list of changed files
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(changedFiles, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetConfFileChangedByPRNumber(prNumber)
+
+		// Assert
+		assert.NoError(t, err)
+		assert.Empty(t, matchingFiles) // No YAML files found
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetConfFileChangedByPRNumber returns an error when GetChangedFilesByPRNumber fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		prNumber := 123
+		expectedErr := errors.New("failed to fetch changed files")
+
+		// Mock the GetChangedFilesByPRNumber method to return an error
+		mockRepo.On("GetChangedFilesByPRNumber", prNumber).Return(nil, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		matchingFiles, err := qgitInstance.GetConfFileChangedByPRNumber(prNumber)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		assert.Nil(t, matchingFiles)
+
+		// Verify that the expectations were met
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestQgit_Checkout(t *testing.T) {
+	t.Run("Checkout a branch reference successfully", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		ref := "refs/heads/main"
+
+		// Mock the CheckRemoteRef to return true for branch
+		mockRepo.On("CheckRemoteRef", ref).Return(true, false, false, nil)
+		mockRepo.On("CheckoutBranch", ref).Return(nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		err := qgitInstance.Checkout(ref)
+
+		// Assert
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Checkout a tag reference successfully", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		ref := "v1.0.0"
+
+		// Mock the CheckRemoteRef to return true for tag
+		mockRepo.On("CheckRemoteRef", ref).Return(false, true, false, nil)
+		mockRepo.On("CheckoutTag", ref).Return(nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		err := qgitInstance.Checkout(ref)
+
+		// Assert
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Checkout a commit hash reference successfully", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		ref := "abc123"
+
+		// Mock the CheckRemoteRef to return true for commit hash
+		mockRepo.On("CheckRemoteRef", ref).Return(false, false, true, nil)
+		mockRepo.On("CheckoutHash", ref).Return(nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		err := qgitInstance.Checkout(ref)
+
+		// Assert
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Checkout returns an error when CheckRemoteRef fails", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		ref := "refs/heads/main"
+		expectedErr := errors.New("failed to check remote ref")
+
+		// Mock the CheckRemoteRef to return an error
+		mockRepo.On("CheckRemoteRef", ref).Return(false, false, false, expectedErr)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		err := qgitInstance.Checkout(ref)
+
+		// Assert
+		assert.Error(t, err)
+		//assert.Equal(t, expectedErr, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Checkout returns an error when reference is not found", func(t *testing.T) {
+		// Arrange
+		mockRepo := new(mocks.Repository)
+		options := qgit.QRepoOptions{
+			Path: "/test/repo",
+			Url:  "https://github.com/test/repo.git",
+		}
+		ref := "unknown_ref"
+
+		// Mock the CheckRemoteRef to return all false
+		mockRepo.On("CheckRemoteRef", ref).Return(false, false, false, nil)
+
+		// Create a Qgit instance
+		qgitInstance := qgit.NewQGit(&options, mockRepo)
+
+		// Act
+		err := qgitInstance.Checkout(ref)
+
+		// Assert
+		assert.Error(t, err)
+		assert.Equal(t, fmt.Sprintf("reference not found: %s", ref), err.Error())
 		mockRepo.AssertExpectations(t)
 	})
 }

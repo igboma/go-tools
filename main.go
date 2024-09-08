@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-
 	"gitpkg/deploycheck"
+	"os"
 )
 
 func main() {
@@ -50,7 +50,34 @@ func main() {
 	fmt.Printf("PR Number: %d\n", prNumber)
 	fmt.Printf("Git URL: %s\n", gitURL)
 
-	deploycheck.DeployChecker(workspace, gitURL, prNumber)
+	action := os.Getenv("GITHUB_EVENT_ACTION")
+	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
+	outputFile := os.Getenv("GITHUB_OUTPUT")
+	token := os.Getenv("GITHUB_TOKEN")
+
+	// type DeployCheckerOption struct {
+	// 	PrNumber   int
+	// 	Token      string
+	// 	Url        string
+	// 	Path       string
+	// 	OutputFile string
+	// 	Action     string
+	// 	PrMerged   string
+	// }
+
+	opt := deploycheck.DeployCheckerOption{
+		Token:      token,
+		PrMerged:   prMerged,
+		Action:     action,
+		OutputFile: outputFile,
+		PrNumber:   prNumber,
+		Url:        gitURL,
+		Path:       workspace,
+	}
+
+	checker := deploycheck.NewDeployChecker(opt)
+	checker.Run()
+	//deploycheck.DeployCheckRunner(workspace, gitURL, prNumber)
 }
 
 // // Main logic
