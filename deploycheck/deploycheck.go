@@ -176,19 +176,28 @@ func (gr *DeployChecker) Run() error {
 	return nil
 }
 
-func NewDeployChecker(opt DeployCheckerOption) *DeployChecker {
+func NewDeployChecker(opt DeployCheckerOption) (*DeployChecker, error) {
 	client, err := qgit.NewClient(
 		qgit.WithRepoPath(opt.Path),
 		qgit.WithRepoUrl(opt.Url),
 	)
+
 	if err != nil {
-		return nil
+		fmt.Println("Error NewClient Repo")
+		return nil, err
 	}
+	err = client.InitRepo()
+
+	if err != nil {
+		fmt.Println("Error init Repo")
+		return nil, err
+	}
+
 	outputWriter := utilities.NewFileOutputWriter(opt.OutputFile)
 
 	checker := &DeployChecker{gitClient: client,
 		outputWriter: outputWriter,
 		option:       opt}
 
-	return checker
+	return checker, nil
 }

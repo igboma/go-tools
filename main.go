@@ -35,8 +35,8 @@ func main() {
 	flag.StringVar(&workspace, "workspace", "", "The GitHub workspace")
 	flag.IntVar(&prNumber, "pr-number", 0, "The Pull Request number")
 	flag.StringVar(&gitURL, "git-url", "", "The Git URL of the PR")
-	flag.StringVar(&sourceBranch, "source-branch", "", "The Git URL of the PR")
-	flag.StringVar(&destinationBranch, "destination-branch", "", "The Git URL of the PR")
+	flag.StringVar(&sourceBranch, "source-branch", "", "sourceBranch")
+	flag.StringVar(&destinationBranch, "destination-branch", "", "destinationBranch")
 
 	// Parse the command-line flags
 	flag.Parse()
@@ -70,11 +70,13 @@ func main() {
 		DestinationBranch: destinationBranch,
 	}
 
-	checker := deploycheck.NewDeployChecker(opt)
+	checker, err := deploycheck.NewDeployChecker(opt)
+	if err != nil {
+		fmt.Println("error in checker")
+	}
 	checker.Run()
 }
 
-// // Main logic
 // func deployChecker(directory string, url string, prNumber int) {
 // 	// Check if the repository path is passed as a command-line argument
 // 	// if len(os.Args) < 2 {
