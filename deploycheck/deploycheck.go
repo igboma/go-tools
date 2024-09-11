@@ -54,8 +54,20 @@ func (gr *DeployChecker) GetConfFileChangedByPRNumber() ([]string, error) {
 	return gr.gitClient.ChangedFiles(gr.option.DestinationBranch, gr.option.SourceBranch)
 }
 
-func (gr *DeployChecker) GetComponentConfFileChangedByPRNumber(pr int) (string, error) {
-	files, _ := gr.gitClient.ChangedFiles(gr.option.DestinationBranch, gr.option.SourceBranch)
+func (gr *DeployChecker) GetComponentConfFileChangedByPRNumber() (string, error) {
+	//destinationBranch := fmt.Sprintf("refs/remotes/origin/%v", gr.option.DestinationBranch)
+	//sourceBranch := fmt.Sprintf("refs/remotes/origin/%v", gr.option.SourceBranch)
+
+	//destinationBranch := "refs/heads/" + gr.option.DestinationBranch
+	//sourceBranch := "refs/heads/igboma-patch-40"
+	//destinationBranch := "refs/heads/main"
+	//sourceBranch := "refs/remotes/origin/igboma-patch-40" // For remote branch
+	//refs/heads/"+ref
+	//files, err := gr.gitClient.ChangedFiles("main", "igboma-patch-40")
+	files, err := gr.gitClient.GetChangedFilesByPRNumber(gr.option.PrNumber)
+	fmt.Println(err)
+	fmt.Println(files)
+
 	if len(files) < 1 {
 		return "", fmt.Errorf("no files found")
 	}
@@ -111,7 +123,8 @@ func (gr *DeployChecker) WriteOutput(key, value string) error {
 }
 
 func (gr *DeployChecker) Run() error {
-	file, err := gr.GetComponentConfFileChangedByPRNumber(gr.option.PrNumber)
+	file, err := gr.GetComponentConfFileChangedByPRNumber()
+	fmt.Printf("file: %v\n", file)
 	if err != nil {
 		return fmt.Errorf("error getting conf file %w", err)
 	}
@@ -121,7 +134,7 @@ func (gr *DeployChecker) Run() error {
 	} else {
 		return fmt.Errorf("invalid config file")
 	}
-
+	fmt.Printf("gr.option.: %v\n", gr.option)
 	if gr.option.Action == "closed" && gr.option.PrMerged == "true" {
 		//fmt.Println("PR is merged...")
 		configData, err := gr.getConfigData(file, "refs/heads/main")
@@ -180,6 +193,7 @@ func NewDeployChecker(opt DeployCheckerOption) (*DeployChecker, error) {
 	client, err := qgit.NewClient(
 		qgit.WithRepoPath(opt.Path),
 		qgit.WithRepoUrl(opt.Url),
+		qgit.WithToken(opt.Token),
 	)
 
 	if err != nil {

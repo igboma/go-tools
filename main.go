@@ -58,6 +58,8 @@ func main() {
 	outputFile := os.Getenv("GITHUB_OUTPUT")
 	token := os.Getenv("GITHUB_TOKEN")
 
+	//console.log("Token ==>", token)
+
 	opt := deploycheck.DeployCheckerOption{
 		Token:             token,
 		PrMerged:          prMerged,
@@ -69,6 +71,8 @@ func main() {
 		SourceBranch:      sourceBranch,
 		DestinationBranch: destinationBranch,
 	}
+
+	fmt.Println(opt)
 
 	checker, err := deploycheck.NewDeployChecker(opt)
 	if err != nil {

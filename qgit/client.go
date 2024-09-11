@@ -158,11 +158,69 @@ func (c *Client) Fetch(ref string) error {
 
 	if err := remote.Fetch(&git.FetchOptions{
 		RefSpecs: refSpecs,
+		Auth: &http.BasicAuth{
+			Username: "git", // GitHub ignores the username but requires it
+			Password: c.opts.Token,
+		},
 	}); err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("fetch origin failed: %w", err)
 	}
 
 	return nil
+}
+
+func (c *Client) GetChangedFilesByPRNumber(prNumber int) (changedFiles []string, err error) {
+
+	if err != nil {
+		return nil, fmt.Errorf("error conneting to repo: %w", err)
+	}
+	// Convert the PR number into a reference that exists in the Git repository
+	// Usually PR references are in the form: refs/pull/{prNumber}/head
+	prRef := fmt.Sprintf("refs/pull/%d/head", prNumber)
+
+	// Fetch the remote branch (PR branch) to ensure the reference exists locally
+	err = c.Fetch(fmt.Sprintf("+%s:%s", prRef, prRef))
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return nil, fmt.Errorf("failed to fetch remote branch %s: %w", prRef, err)
+	}
+
+	// Get the current HEAD reference (main branch)
+	//currentRef, err := gr.Head()
+	currentRef, err := c.repo.Head()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	// Resolve the comparison reference from the PR (origin)
+	compareRef, err := c.repo.Reference(plumbing.ReferenceName(prRef), true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve reference %s: %w", prRef, err)
+	}
+	// Get the commit for the comparison reference (PR branch)
+	compareCommit, err := c.repo.CommitObject(compareRef.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit for ref %s: %w", prRef, err)
+	}
+
+	// Get the commit for the current HEAD reference (main branch)
+	currentCommit, err := c.repo.CommitObject(currentRef.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current commit: %w", err)
+	}
+
+	// Get the file changes between the two commits
+	patch, err := currentCommit.Patch(compareCommit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate patch: %w", err)
+	}
+
+	// Collect the list of changed files
+	for _, fileStat := range patch.Stats() {
+		changedFiles = append(changedFiles, fileStat.Name)
+	}
+
+	return changedFiles, nil
 }
 
 // CheckRemoteRef checks if the specified reference is a branch, tag, or commit hash by querying the remote repository.
@@ -309,6 +367,7 @@ func (c *Client) changedFiles(base, current string) (*object.Changes, error) {
 func (c *Client) ChangedFiles(base, current string) (changedFiles []string, err error) {
 	changes, err := c.changedFiles(base, current)
 	if err != nil {
+
 		return nil, err
 	}
 	patch, err := changes.Patch()
