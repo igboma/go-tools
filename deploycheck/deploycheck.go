@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"gitpkg/qgit"
 	"gitpkg/utilities"
-	"log"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -28,17 +27,19 @@ type ConfigFile struct {
 	DeploymentWindow               int    `yaml:"deploymentWindow"`
 }
 type DeployCheckerOption struct {
-	PrNumber   int
-	Token      string
-	Url        string
-	Path       string
-	OutputFile string
-	Action     string
-	PrMerged   string
+	PrNumber          int
+	Token             string
+	Url               string
+	Path              string
+	OutputFile        string
+	Action            string
+	PrMerged          string
+	SourceBranch      string
+	DestinationBranch string
 }
 
 type DeployChecker struct {
-	gitClient      qgit.QGitClient
+	gitClient      *qgit.Client
 	outputWriter   *utilities.FileOutputWriter
 	option         DeployCheckerOption
 	component      string
@@ -49,12 +50,15 @@ type DeployChecker struct {
 	isRelease      string
 }
 
-func (gr *DeployChecker) GetConfFileChangedByPRNumber(pr int) ([]string, error) {
-	return gr.gitClient.GetConfFileChangedByPRNumber(pr)
+func (gr *DeployChecker) GetConfFileChangedByPRNumber() ([]string, error) {
+	return gr.gitClient.ChangedFiles(gr.option.DestinationBranch, gr.option.SourceBranch)
 }
 
 func (gr *DeployChecker) GetComponentConfFileChangedByPRNumber(pr int) (string, error) {
-	files, _ := gr.gitClient.GetConfFileChangedByPRNumber(pr)
+	files, _ := gr.gitClient.ChangedFiles(gr.option.DestinationBranch, gr.option.SourceBranch)
+	if len(files) < 1 {
+		return "", fmt.Errorf("no files found")
+	}
 	if len(files) > 1 {
 		return "", fmt.Errorf("more than one file was changed")
 	}
@@ -69,7 +73,7 @@ func (gr *DeployChecker) GetComponentConfFileChangedByPRNumber(pr int) (string, 
 }
 
 func (gr *DeployChecker) getConfigData(file, ref string) (configData *ConfigFile, err error) {
-	configContent, err := gr.gitClient.GetFileContentFromBranch(ref, file)
+	configContent, err := gr.gitClient.FileContentFromBranch(ref, file)
 	if err != nil {
 		return
 	}
@@ -111,22 +115,26 @@ func (gr *DeployChecker) Run() error {
 	if err != nil {
 		return fmt.Errorf("error getting conf file %w", err)
 	}
-	gr.component = strings.Split(file, "/")[1]
-	gr.environment = strings.Split(file, "/")[2]
+	if len(strings.Split(file, "/")) > 2 {
+		gr.component = strings.Split(file, "/")[1]
+		gr.environment = strings.Split(file, "/")[2]
+	} else {
+		return fmt.Errorf("invalid config file")
+	}
 
 	if gr.option.Action == "closed" && gr.option.PrMerged == "true" {
 		//fmt.Println("PR is merged...")
 		configData, err := gr.getConfigData(file, "refs/heads/main")
 		fmt.Printf("configData: %v\n", configData)
 		if err != nil {
-			log.Fatalf("Failed to get version and heoRevision: %v", err)
+			return fmt.Errorf("failed to get version and heoRevision: %w", err)
 		}
 		gr.version = configData.Version
 		gr.heoRevision = configData.HeoRevision
 	} else {
 		source, destination, err := gr.GetSourceAndDestimationConf(file, gr.option.PrNumber, "main")
 		if err != nil {
-			log.Fatalf("Error checking version and heoRevision: %v", err)
+			return fmt.Errorf("error checking version and heoRevision: %w", err)
 		}
 		fmt.Printf("\nsource: %v\n", source.Version)
 		fmt.Printf("destination: %v\n", destination.Version)
@@ -169,17 +177,18 @@ func (gr *DeployChecker) Run() error {
 }
 
 func NewDeployChecker(opt DeployCheckerOption) *DeployChecker {
-	options := qgit.QRepoOptions{
-		Url:   opt.Url,
-		Path:  opt.Path,
-		Token: opt.Token,
+	client, err := qgit.NewClient(
+		qgit.WithRepoPath(opt.Path),
+		qgit.WithRepoUrl(opt.Url),
+	)
+	if err != nil {
+		return nil
 	}
-	var repo qgit.Repository = &qgit.QGitRepo{}
-	// Handle error from NewQGit
-	client := qgit.NewQGit(&options, repo)
 	outputWriter := utilities.NewFileOutputWriter(opt.OutputFile)
+
 	checker := &DeployChecker{gitClient: client,
 		outputWriter: outputWriter,
 		option:       opt}
+
 	return checker
 }

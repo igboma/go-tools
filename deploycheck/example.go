@@ -3,6 +3,8 @@ package deploycheck
 import (
 	"flag"
 	"fmt"
+	"gitpkg/qgit"
+	"gitpkg/utilities"
 	"os"
 )
 
@@ -48,7 +50,19 @@ func Runner() {
 		Url:        gitURL,
 		Path:       workspace,
 	}
+	//var repo qgit.Repository = &qgit.QGitRepo{}
 
-	checker := NewDeployChecker(opt)
+	client, _ := qgit.NewClient(
+		qgit.WithRepoPath(opt.Path),
+		qgit.WithRepoUrl(opt.Url),
+	)
+
+	outputWriter := utilities.NewFileOutputWriter(opt.OutputFile)
+
+	checker := &DeployChecker{gitClient: client,
+		outputWriter: outputWriter,
+		option:       opt}
+
+	//checker := NewDeployChecker(opt)
 	checker.Run()
 }

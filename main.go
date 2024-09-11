@@ -29,12 +29,14 @@ func main() {
 
 	var workspace string
 	var prNumber int
-	var gitURL string
+	var gitURL, sourceBranch, destinationBranch string
 
 	// Bind the flags to variables
 	flag.StringVar(&workspace, "workspace", "", "The GitHub workspace")
 	flag.IntVar(&prNumber, "pr-number", 0, "The Pull Request number")
 	flag.StringVar(&gitURL, "git-url", "", "The Git URL of the PR")
+	flag.StringVar(&sourceBranch, "source-branch", "", "The Git URL of the PR")
+	flag.StringVar(&destinationBranch, "destination-branch", "", "The Git URL of the PR")
 
 	// Parse the command-line flags
 	flag.Parse()
@@ -48,36 +50,28 @@ func main() {
 	// Use the flag values in your program
 	fmt.Printf("Workspace: %s\n", workspace)
 	fmt.Printf("PR Number: %d\n", prNumber)
-	fmt.Printf("Git URL: %s\n", gitURL)
+	fmt.Printf("destinationBranch: %s\n", destinationBranch)
+	fmt.Printf("sourceBranch: %s\n", sourceBranch)
 
 	action := os.Getenv("GITHUB_EVENT_ACTION")
 	prMerged := os.Getenv("GITHUB_EVENT_PR_MERGED")
 	outputFile := os.Getenv("GITHUB_OUTPUT")
 	token := os.Getenv("GITHUB_TOKEN")
 
-	// type DeployCheckerOption struct {
-	// 	PrNumber   int
-	// 	Token      string
-	// 	Url        string
-	// 	Path       string
-	// 	OutputFile string
-	// 	Action     string
-	// 	PrMerged   string
-	// }
-
 	opt := deploycheck.DeployCheckerOption{
-		Token:      token,
-		PrMerged:   prMerged,
-		Action:     action,
-		OutputFile: outputFile,
-		PrNumber:   prNumber,
-		Url:        gitURL,
-		Path:       workspace,
+		Token:             token,
+		PrMerged:          prMerged,
+		Action:            action,
+		OutputFile:        outputFile,
+		PrNumber:          prNumber,
+		Url:               gitURL,
+		Path:              workspace,
+		SourceBranch:      sourceBranch,
+		DestinationBranch: destinationBranch,
 	}
 
 	checker := deploycheck.NewDeployChecker(opt)
 	checker.Run()
-	//deploycheck.DeployCheckRunner(workspace, gitURL, prNumber)
 }
 
 // // Main logic
