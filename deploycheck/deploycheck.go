@@ -87,7 +87,7 @@ func (gr *DeployChecker) GetComponentConfFileChangedByPRNumber() (string, error)
 func (gr *DeployChecker) getConfigData(file, ref string) (configData *ConfigFile, err error) {
 	fmt.Println("file ==>", file)
 	fmt.Println("ref ==>", ref)
-	configContent, err := gr.gitClient.GetFileContentFromBranch(ref, file)
+	configContent, err := gr.gitClient.FileContentFromBranch(ref, file)
 	fmt.Printf("content ==> %v \n", configContent)
 	if err != nil {
 		return
