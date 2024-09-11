@@ -319,13 +319,41 @@ func (c *Client) FileContentFromCommit(commitHash, file string) (content string,
 // Parameters:
 //   - branch: The branch name from which to retrieve the file (e.g., "main").
 //   - file: The path of the file whose content needs to be retrieved.
-func (c *Client) FileContentFromBranch(branch, file string) (content string, err error) {
+
+func (gr *Client) FileContentFromBranch(branch, file string) (content string, err error) {
+
 	// Get the reference to the specified branch
-	ref, err := c.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
+	ref, err := gr.repo.Reference(plumbing.ReferenceName(branch), true)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolved branch ref: %w", err)
+		return "", err
 	}
-	return c.FileContentFromCommit(ref.Hash().String(), file)
+
+	// Get the commit object for the latest commit on the branch
+	commit, err := gr.repo.CommitObject(ref.Hash())
+	if err != nil {
+		return "", err
+	}
+
+	// Get the tree (file structure) associated with the commit
+	tree, err := commit.Tree()
+	if err != nil {
+		return "", err
+	}
+
+	// Find the file entry in the tree
+	entry, err := tree.File(file)
+	if err != nil {
+		return "", err
+	}
+
+	// Retrieve the file contents
+	content, err = entry.Contents()
+	if err != nil {
+		return "", err
+	}
+
+	// Return the file content
+	return content, nil
 }
 
 func (c *Client) changedFiles(base, current string) (*object.Changes, error) {
