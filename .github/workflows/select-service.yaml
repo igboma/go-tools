@@ -1,0 +1,251 @@
+name: Validate Helm Chart Manifests with Kubeconform for all values.yaml files
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to run the workflow on"
+        required: true
+        default: "master"
+      component:
+        description: "Component to validate"
+        required: true
+      view_gomplate:
+        description: "Enable viewing the gomplated file"
+        required: false
+        default: false
+        type: boolean
+      view_manifest:
+        description: "Enable viewing the generated manifest"
+        required: false
+        default: false
+        type: boolean
+jobs:
+  validate-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      # Print GitHub event information
+      - name: Print event info
+        uses: qlik-trial/qlik-releaser/.github/actions/print-event-info@master
+
+      # Checkout primary repository (codebase under test)
+      - name: Checkout primary repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      # Display the checked-out branch
+      - name: Display checked-out branch
+        run: |
+          echo "Checked out branch: ${{ github.event.inputs.branch }}"
+
+      # Checkout gitops-environments repository for environment configurations
+      - name: Checkout gitops-environments repository
+        uses: actions/checkout@v4
+        with:
+          repository: qlik-trial/gitops-environments
+          token: ${{ secrets.GH_ACCESS_TOKEN_4 }}
+          path: gitops-environments
+          ref: main
+
+      # Install gomplate templating tool
+      - name: Install gomplate
+        run: |
+          mkdir bin
+          curl -o bin/gomplate -L "https://github.com/hairyhenderson/gomplate/releases/download/v3.10.0/gomplate_linux-amd64"
+          chmod +x bin/gomplate
+          echo "${PWD}/bin" >> $GITHUB_PATH
+
+      # Install Helm for managing Kubernetes charts
+      - name: Install Helm
+        uses: azure/setup-helm@v4.1.0
+        with:
+          version: 'v3.14.3'
+
+      # Install Kubeconform for validating Kubernetes manifests
+      - name: Install Kubeconform
+        run: |
+          curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+          rm kubeconform.tar.gz
+
+      - name: Helm login to GHCR
+        shell: bash
+        run: |
+          echo ${{ secrets.QLIK_DOCKER_DEV_PASSWORD }} | helm registry login --username ${{ secrets.QLIK_DOCKER_DEV_USERNAME }} --password-stdin ${{ secrets.QLIK_DOCKER_DEV_REGISTRY }}/helm
+
+      # Process, template, and validate YAML files
+      - name: Process files, create sealed-secrets structure, and validate Helm template
+        run: |
+          set +e  # Disable immediate exit on error
+
+          SCRIPT_BASE=$(pwd)
+          component="${{ github.event.inputs.component }}"
+
+          # Initialize log files for failed, successful, and skipped validation summaries
+          failed_summaries_file="failed_summaries.txt"
+          success_summaries_file="success_summaries.txt"
+          skipped_summaries_file="skipped_summaries.txt"
+          : > "$failed_summaries_file"
+          : > "$success_summaries_file"
+          : > "$skipped_summaries_file"
+
+          file="qcs/$component/values.yaml"
+        
+          # Copy all content, including directories and files, from qcs/$component to ${component}-values/qcs/$component
+          source_dir="qcs/$component"
+          target_dir="${component}-values/qcs/$component"
+
+          if [[ -d "$source_dir" ]]; then
+            mkdir -p "$target_dir"
+            cp -a "$source_dir/." "$target_dir/"
+            echo "All content from $source_dir copied to $target_dir"
+          else
+              echo "Source directory $source_dir does not exist; skipping."
+          fi
+          
+          pipeline_environments=$(yq '.pipeline-environments[]' gitops-environments/environments.yaml)
+
+          # Create temporary directories for generated manifests and charts
+          mkdir -p tmp gomplate-helm/chart
+          
+          # Iterate over each environment to generate and validate manifests
+          for env in $pipeline_environments; do
+            case "$env" in
+              "qlik-cloud-services-int-env")
+                ENVIRONMENT="qcs-int"
+                REGION="eu-central-1"
+                ;;
+              "lef-stage-us-east-1")
+                echo "Skipping environment $env for component $component" >> "$skipped_summaries_file"
+                continue
+                ;;
+              *-prod-*)
+                ENVIRONMENT="prod"
+                REGION=$(echo "$env" | awk -F'-' '{print $(NF-2) "-" $(NF-1) "-" $NF}')
+                ;;
+              *-stage-*)
+                ENVIRONMENT="stage"
+                REGION=$(echo "$env" | awk -F'-' '{print $(NF-2) "-" $(NF-1) "-" $NF}')
+                ;;
+              *)
+                echo "Skipping Unknown environment pattern for $env" >> "$skipped_summaries_file"
+                continue
+                ;;
+            esac
+            echo "Using ENVIRONMENT=$ENVIRONMENT and REGION=$REGION for $env"
+
+            # Check if specific conditions are met for skipping
+            sealed_secrets_dir="${component}-values/qcs/$component/sealed-secrets"
+            specific_secrets_dir="$sealed_secrets_dir/$ENVIRONMENT/$REGION"
+            contains_sealed_secrets=$(grep -q "{{- if .useSealedSecrets }}" "$file" && echo "true" || echo "false")
+
+            # Skip based on the combined condition
+            if [[ -d "$sealed_secrets_dir" && ! -d "$specific_secrets_dir" ]]; then
+              echo "Skipping $component for $ENVIRONMENT/$REGION because $specific_secrets_dir does not exist and uses sealed secrets." >> "$skipped_summaries_file"
+              continue
+            fi
+
+            # Load version from conf.yaml file if present
+            conf_file="gitops-environments/components/$component/$env/conf.yaml"
+            if [[ ! -f "$conf_file" ]]; then
+              echo "Skipping $conf for $ENVIRONMENT/$REGION because \"$conf_file\" does not exist." >> "$skipped_summaries_file"
+              continue
+            fi
+            version=$(grep -E "^version:" "$conf_file" | awk '{print $2}')
+            manifest_output="tmp/${component}_${env}_v${version}_rendered-manifest.yaml"
+            gomplated_file="${file%/values.yaml}/values_templated.yaml"
+
+            # Generate gomplated YAML file and validate it
+            echo "gomplating $component with value file : $file ; Version: $version"
+            gomplate_output=$(ENVIRONMENT=$ENVIRONMENT REGION=$REGION CONTAINER_REGISTRY_URL=registry.com \
+              ./bin/gomplate -f "$file" \
+              -d "vault=file://${SCRIPT_BASE}/scripts/vaultMock?type=application/json" \
+              -o "$gomplated_file" 2>&1)
+            gomplate_exit_code=$?
+
+            # Display the gomplated file if view_gomplate is enabled
+            if [[ "${{ github.event.inputs.view_gomplate }}" == "true" ]]; then
+              echo "Gomplated file contents for $component:"
+              cat "$gomplated_file"
+            fi
+
+            # Log and continue if gomplate generation fails
+            if [[ $gomplate_exit_code -ne 0 ]]; then
+              echo "Component: $component, Environment: $env, Version: $version, Error: Gomplate rendering failed with error: $gomplate_output" >> "$failed_summaries_file"
+              continue
+            fi
+
+            
+
+            # Validate gomplated YAML syntax
+            if ! yq eval '.' "$gomplated_file" >/dev/null 2>&1; then
+              echo "Component: $component, Environment: $env, Version: $version, Error: Invalid YAML syntax in gomplated file" >> "$failed_summaries_file"
+              continue
+            fi
+
+            # Pull Helm chart and handle errors
+            rm -rf ./gomplate-helm/chart/$component
+            helm_pull_output=$(helm pull --version "$version" oci://ghcr.io/qlik-trial/helm/$component --untar --untardir ./gomplate-helm/chart 2>&1)
+            helm_pull_exit_code=$?
+
+            if [[ $helm_pull_exit_code -ne 0 ]]; then
+              if [[ "$helm_pull_output" == *"not found"* ]]; then
+                echo "Component: $component, Environment: $env, Version: $version - Helm chart not found. Skipping." >> "$skipped_summaries_file"
+                continue
+              else
+                echo "Component: $component, Environment: $env, Version: $version, Error: Helm pull failed with error: $helm_pull_output" >> "$failed_summaries_file"
+                continue
+              fi
+            fi
+
+            # Generate Kubernetes manifest using Helm template
+            helm_output=$(helm template --include-crds --kube-version 1.25 --api-versions apiregistration.k8s.io/v1 --api-versions cert-manager.io/v1 \
+              --release-name ${component}-release \
+              ./gomplate-helm/chart/${component} -f "$gomplated_file" > "$manifest_output" 2>&1)
+            helm_exit_code=$?
+
+            # Log if Helm templating fails
+            if [[ $helm_exit_code -ne 0 ]]; then
+              echo "Component: $component, Environment: $env, Version: $version, Error: Helm template generation failed with error: $helm_output" >> "$failed_summaries_file"
+              continue
+            fi
+
+            # Validate manifest using Kubeconform
+            validation_output=$(kubeconform -summary -ignore-missing-schemas "$manifest_output" 2>&1)
+            exit_code=$?
+
+            if [[ $exit_code -ne 0 ]]; then
+              echo "Component: $component, Environment: $env, Version: $version, Error: $validation_output" >> "$failed_summaries_file"
+            else
+              echo "Component: $component, Environment: $env, Version: $version, Validation passed." >> "$success_summaries_file"
+            fi
+
+            # Display the manifest if view_manifest is enabled
+            if [[ "${{ github.event.inputs.view_manifest }}" == "true" ]]; then
+              echo "Generated manifest:"
+              cat "$manifest_output"
+            fi
+          done
+
+      # Summarize validation results and exit with failure if any component failed
+      - name: Summarize Validation Results
+        run: |
+          if [ -s failed_summaries.txt ]; then
+            echo "Validation errors found in the following components:"
+            cat failed_summaries.txt
+          fi
+          
+          if [ -s skipped_summaries.txt ]; then
+            echo "The following components were skipped:"
+            cat skipped_summaries.txt
+          fi
+
+          if [ -s failed_summaries.txt ]; then
+            exit 1
+          else
+            echo "All validations passed successfully."
+            cat success_summaries.txt
+          fi
