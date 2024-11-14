@@ -1,0 +1,192 @@
+name: Identify and Process Changed values.yaml Files
+
+on:
+  push:
+    branches:
+      - template-lint-test
+
+jobs:
+  identify-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.extract-components.outputs.components }}
+      has_components: ${{ steps.extract-components.outputs.has_components }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get all changed values.yaml files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: 'qcs/*/values.yaml'
+
+      - name: Install gomplate
+        run: |
+          mkdir bin
+          curl -o bin/gomplate -L "https://github.com/hairyhenderson/gomplate/releases/download/v3.10.0/gomplate_linux-amd64"
+          chmod +x bin/gomplate
+          echo "${PWD}/bin" >> $GITHUB_PATH
+
+      - name: List changed files
+        run: |
+          echo "Changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+
+      - name: Create mock vault directory and keys from vaultMock.yaml
+        run: |
+          mkdir -p ~/workspace/vaultMock
+          # Read the vault keys from vaultMock.yaml and create mock files
+          vault_keys=$(yq '.vault_keys' vaultMock.yaml)
+
+          for key in $vault_keys; do
+            echo "{\"value\":\"mock-${key,,}-value\"}" > ~/workspace/vaultMock/"$key"
+          done
+
+      - name: Extract components
+        id: extract-components
+        run: |
+          changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
+          if [[ -n "$changed_files" ]]; then
+            components=$(echo "$changed_files" | awk -F'/' '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+            has_components="true"
+          else
+            components="[]"  # Set to empty JSON array if no components found
+            has_components="false"
+          fi
+          echo "Extracted components: $components"
+          echo "components=$components" >> $GITHUB_ENV
+          echo "has_components=$has_components" >> $GITHUB_ENV
+          echo "::set-output name=components::$components"  # For backward compatibility
+          echo "::set-output name=has_components::$has_components"
+
+      - name: Apply Gomplate to values.yaml files
+        run: |
+          BASE_DIR=~/workspace
+          for file in $(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n'); do
+            component=$(echo "$file" | awk -F'/' '{print $2}')
+            output_file="qcs/$component/values_templated.yaml"
+            echo "Applying gomplate to $file, outputting to $output_file"
+            
+            # Define and copy sealed-secrets if present
+            sealed_secrets_dir="qcs/$component/sealed-secrets"
+            if [[ -d "$sealed_secrets_dir" ]]; then
+              target_dir="${component}-values/qcs/$component"
+              mkdir -p "$target_dir"
+              cp -r "$sealed_secrets_dir" "$target_dir/"
+              echo "Copied $sealed_secrets_dir to $target_dir/"
+            else
+              echo "No sealed-secrets directory found for $component at $sealed_secrets_dir"
+            fi
+
+            # Run gomplate
+            gomplate_output=$(ENVIRONMENT=stage REGION=eu-west-1 CONTAINER_REGISTRY_URL=registry.com \
+              ./bin/gomplate \
+              -f "$file" \
+              -d "vault=file://${BASE_DIR}/vaultMock?type=application/json" \
+              -d "automations_vault=file://${BASE_DIR}/vaultMock?type=application/json" \
+              -d "global_environment_vault=file://${BASE_DIR}/vaultMock?type=application/json" \
+              -d "reporting_generator_vault=file://${BASE_DIR}/vaultMock?type=application/json" \
+              -d "replicate_agent_vault=file://${BASE_DIR}/vaultMock?type=application/json" \
+              -o "$output_file" 2>&1)
+            gomplate_exit_code=$?
+            if [[ $gomplate_exit_code -ne 0 ]]; then
+              echo "Error applying gomplate to $file:"
+              echo "$gomplate_output"
+              exit $gomplate_exit_code
+            else
+              echo "Gomplated $file to $output_file"
+              cat "$output_file"  # Output the content of the templated file for debugging
+            fi
+          done
+
+      - name: Copy component folders to artifact directory
+        run: |
+          mkdir -p artifacts/qcs
+          for file in $(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n'); do
+            component=$(echo "$file" | awk -F'/' '{print $2}')
+            mkdir -p "artifacts/qcs/$component"
+            cp -r "qcs/$component/." "artifacts/qcs/$component/"
+            echo "Copied qcs/$component to artifacts/qcs/$component/"
+          done
+
+      - name: Upload changed component folders as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changed-values-files
+          path: artifacts/
+          if-no-files-found: warn
+
+  process-changes:
+    runs-on: ubuntu-latest
+    needs: identify-changes
+    if: needs.identify-changes.outputs.has_components == 'true'
+    strategy:
+      matrix:
+        component: ${{ fromJson(needs.identify-changes.outputs.components) }}
+    steps:
+      - name: Debug component name
+        run: |
+          echo "Processing component: ${{ matrix.component }}"
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: changed-values-files
+          path: /tmp/downloaded-artifacts
+
+      - name: List all downloaded files for debugging
+        run: |
+          echo "Listing all files in /tmp/downloaded-artifacts after downloading artifact:"
+          ls -R /tmp/downloaded-artifacts
+
+      - name: List downloaded files for component
+        run: |
+          echo "Files for component ${{ matrix.component }}:"
+          ls -R "/tmp/downloaded-artifacts/qcs/${{ matrix.component }}" || echo "Directory /tmp/downloaded-artifacts/qcs/${{ matrix.component }} does not exist"
+
+      - name: Display contents of values.yaml
+        run: |
+          values_file="/tmp/downloaded-artifacts/qcs/${{ matrix.component }}/values.yaml"
+          if [[ -f "$values_file" ]]; then
+            echo "Contents of values.yaml for ${{ matrix.component }}:"
+            cat "$values_file"
+          else
+            echo "No values.yaml file found for ${{ matrix.component }}"
+          fi
+
+      - name: Display contents of values_templated.yaml
+        run: |
+          values_templated_file="/tmp/downloaded-artifacts/qcs/${{ matrix.component }}/values_templated.yaml"
+          if [[ -f "$values_templated_file" ]]; then
+            echo "Contents of values_templated.yaml for ${{ matrix.component }}:"
+            cat "$values_templated_file"
+          else
+            echo "No values_templated.yaml file found for ${{ matrix.component }}"
+          fi
+
+      - name: Checkout component repository
+        uses: actions/checkout@v4
+        with:
+          repository: "qlik-trial/${{ matrix.component }}"
+          path: "${{ matrix.component }}-repo"
+          token: ${{ secrets.GH_ACCESS_TOKEN_4 }}
+
+      - name: Debug checkout content
+        run: |
+          echo "Listing files in component repo: ${{ matrix.component }}-repo"
+          ls -R "${{ matrix.component }}-repo"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4.1.0
+        with:
+          version: 'v3.14.3'
+
+      - name: Install Kubeconform
+        run: |
+          curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+          rm kubeconform.tar.gz
