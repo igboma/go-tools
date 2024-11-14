@@ -1,4 +1,4 @@
-name: Validate Helm Chart Manifests with Kubeconform for all values.yaml files
+name: Validate Helm Chart Manifests with Kubeconform for a given component
 
 on:
   workflow_dispatch:
