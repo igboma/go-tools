@@ -1,0 +1,589 @@
+## Data Connector ODBC Service
+## Default values: https://github.com/qlik-trial/elastic-charts/blob/master/charts/data-connector-odbc/values.yaml
+{{ $environment := getenv "ENVIRONMENT" "local" -}}
+{{ $region := getenv "REGION" "localregion" -}}
+{{ $registry := getenv "CONTAINER_REGISTRY_URL" "" -}}
+{{ $provider := getenv "PROVIDER" "aws" -}}
+{{ $solaceDomainName := getenv "SOLACE_DOMAIN_NAME" -}}
+{{- $enable_capacity_reduction := getenv "ENABLE_CAPACITY_REDUCTION" "false" -}}
+{{- $onboarding := getenv "ONBOARDING" "false" -}}
+{{ $karpenterEnabled := getenv "KARPENTER_ENABLED" "false" -}}
+{{ $useSealedSecrets := (ne $provider "fedramp") -}}
+
+
+global:
+  imageRegistry: {{ $registry }}
+
+image:
+  # negate pullSecrets so that it will not be rendered and log warnings
+  # in Splunk, the default value is artifactory-docker-secret which is
+  # used in our builds, Forts, and in SDEs
+  pullSecrets: ~
+
+configs:
+  ## Number of seconds to wait during pod termination until SIGKILL.
+  terminationGracePeriodSeconds: 10800
+  data:
+{{- if or (eq $environment "qcs-int") ( and (eq $environment "stage") (eq $region "us-east-1")) }}
+    redisUri: "data-connector-odbc-redis-master:6379,abortConnect=false"
+{{- end }}
+    qsEnvironment: "QCS"
+    reuseReloadSession: "true"
+    natsStreamingClusterId: messaging-nats-streaming-cluster
+    natsUri: nats://messaging-nats-client:4222
+    solaceUri: "tcps://{{ $solaceDomainName }}:55443"
+    solaceMessageVpn: QcsPrimary
+    edgeAuthUri: http://edge-auth:8080
+    featureFlagsUri: http://feature-flags:8080
+
+# Make rendering secrets vs sealed secrets mutually exclusive.
+{{- if $useSealedSecrets }}
+secrets: ~
+
+{{ file.Read (path.Join "data-connector-odbc-values/qcs/data-connector-odbc/sealed-secrets/" $environment $region "sealed-secrets.yaml") }}
+{{- else }}
+secrets:
+  data:
+    connectorSettings: |
+{{(datasource "vault" "qcs_secrets_v2").value | base64.Encode | indent 6 }}
+
+  stringData:
+    redisPassword: {{ ( ds "vault" "redisPassword").value | printf "%q" }}
+    tokenEncryptionkey: {{ ( ds "vault" "tokenEncryptionkey").value | printf "%q" }}
+    encKeyForConnectorSettings: |-
+{{(ds "vault" "enc_key_for_connector_settings_v1").value | indent 6 }}
+
+{{- end }}
+
+tracing:
+  enabled: true
+
+keys:
+  request:
+    enabled: true
+    autoRotate: true
+
+data-connector-odbc-cmd:
+  replicas: 2
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: qlik.com/dedicated
+                operator: In
+                values:
+                  - connector
+  tolerations:
+    - key: "qlik.com/dedicated"
+      operator: "Equal"
+      value: "connector"
+      effect: "NoSchedule"
+  terminationGracePeriodSeconds: 300
+  data-connector-odbc:
+    resources:
+      limits:
+        memory: "3Gi"
+      requests:
+        cpu: 0.25
+        memory: "500Mi"
+    configs:
+      shutdownTimeout: "300"
+{{- if and (eq $environment "prod") (eq $region "us-east-1" "eu-west-1") }}
+      odbcDriversLog: mssql,azure_sql
+      odbcDriversLogLevel: 4
+{{- end }}
+      dotnetRollForward: "LatestMajor"
+      data:
+        logLevel: true
+        dataHost: true
+        dataPortRangeStart: true
+        dataPortRangeEnd: true
+        standalone: true
+        config: true
+        serviceMode: true
+        qsEnvironment: true
+        otlpServiceName: true
+    probes:
+      timeoutSeconds: 5
+
+data-connector-odbc-rld:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: qlik.com/dedicated
+                operator: In
+                values:
+                  - connector
+  tolerations:
+    - key: "qlik.com/dedicated"
+      operator: "Equal"
+      value: "connector"
+      effect: "NoSchedule"
+  terminationGracePeriodSeconds: 10800
+  data-connector-odbc:
+    resources:
+      limits:
+        memory: "9Gi"
+      requests:
+{{- if and (eq $environment "prod") (eq $region "us-east-1" "eu-west-1") }}
+        cpu: 2
+        memory: "4Gi"
+{{- else if and (eq $environment "prod") (eq $region "ap-southeast-2" "ap-southeast-1") }}
+        cpu: 1.5
+        memory: "3Gi"
+{{- else }}
+        cpu: 0.75
+        memory: "1.5Gi"
+{{- end }}
+    configs:
+      enableShutdownDrain: "true"
+      shutdownTimeout: "10800"
+      dotnetMinWorkerThreads: "32"
+      dotnetRollForward: "LatestMajor"
+      maxActiveReloads: "4"
+      reloadsAboveMaxAllowance: "3" # allow 3 additional reloads (1 reserved for existing session) during reload burst
+      maxRejectCount: "2" # for new session only allow after 2 retries
+      # this will set the log level to 0  which will effectively disable the log for mssql
+      odbcDriversLog: mssql
+      odbcDriversLogLevel: "0"
+      natsEnabled: "true"
+      messagingEnabled: "true"
+      messagingPublishingenabled: "true"
+      solaceEnabled: "true"
+      messagingFeatureflagsEnablefeatureflagservicecall: "true"
+      messagingAddhealthcheck: "true"
+      datachunkWriteTimeout: 600
+{{- if (eq $provider "fedramp")}}
+      sslTrustStoreDir: "/opt/cacerts"
+{{- end}}
+      data:
+        logLevel: true
+        dataHost: true
+        dataPortRangeStart: true
+        dataPortRangeEnd: true
+        standalone: true
+        config: true
+        serviceMode: true
+        qsEnvironment: true
+    probes:
+      timeoutSeconds: 10
+
+errorConfigurations:
+# for system tests tenants, set status to unhealthy after 1 failure
+{{- if and (eq $environment "prod") (eq "us-east-1" $region) }}
+- tenantId: "xIB018tmvjxmqi1maszkZfKTUOS2V42C" # system-test-waluigi.us.qlikcloud.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+- tenantId: "KP3iKVf3CgrKpDPPez_cQudkBbaEApXA" # connectivity-test.us.qlikcloud.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- else if and (eq $environment "prod") (eq "eu-west-1" $region) }}
+- tenantId: "T-cmHas91qwwjAh8PsQSuE6g3dogNfvk" # system-test-mario.eu.qlikcloud.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- else if and (eq $environment "prod") (eq "ap-southeast-2" $region) }}
+- tenantId: "kqn8RscL_FvfReHNrKP7FsJIzYzfJgK6" # system-test-yoshi.ap.qlikcloud.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- else if and (eq $environment "prod") (eq "ap-southeast-1" $region) }}
+- tenantId: "vJpPQtmMoOBztqqYyUDQLDhwASnpoYB_" # system-test-toad.sg.qlikcloud.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- else if and (eq $environment "stage") (eq "us-east-1" $region) }}
+- tenantId: "S5kWMeyk0stcJ4N9z3Tbo8fgiX8_7fpx" # system-test-peach.us.qlik-stage.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+- tenantId: "ciQdbTOx9Nh3y4OMzYSyPqYeNidceu7i" # system-test-wario.us.qlik-stage.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- else if and (eq $environment "stage") (eq "eu-west-1" $region) }}
+- tenantId: "d7S83hywtffSuiPfUQZ2BfYkOKbsLzgL" # system-test-mario.eu.qlik-stage.com
+  errorMessage: "SqlServer.+Connection failed"
+  errorCount: 1
+  ready: false
+  healthy: false
+  internalError: true
+{{- end }}
+# for any other tenants getting the following error message, set status to unhealthy after 5 failures
+- errorMessage: "SqlServer.+Connection failed"
+  errorCount: 5
+  ready: false
+  healthy: false
+  internalError: true
+
+## data-connector-odbc-rld hpa settings
+hpaRld:
+  enabled: true
+  apiVersion: "autoscaling/v2" # no longer needed after upgrade to qlikcommon 3.4.0
+  metric:
+    name: "connector_active_getdata_requests"
+    targetAverageValue: 3.2
+{{- if and (eq $environment "prod") (eq "us-east-1" $region) }}
+  minReplicas: 60
+{{- else if and (eq $environment "prod") (eq "eu-west-1" $region) }}
+  minReplicas: 60
+{{- else if and (eq $environment "prod") (eq "ap-southeast-1" $region) }}
+  minReplicas: 10
+{{- else if and (eq $environment "prod") (eq "ap-southeast-2" $region) }}
+  minReplicas: 10
+{{- else }}
+  minReplicas: 1
+{{- end }}
+{{- if and (eq $environment "prod") (eq "eu-west-1" $region) }}
+  maxReplicas: 110
+{{- else if and (eq $environment "prod") (eq "us-east-1" $region) }}
+  maxReplicas: 100
+{{- else }}
+  maxReplicas: 85
+{{- end }}
+
+## The network policy section associated with this chart.
+networkPolicy:
+  ## ipBlock configs: this selects particular IP CIDR ranges to allow as egress destinations
+  ipBlock:
+    ## The External CIDR block that the pod is allowed to connect to
+    allowedExtCidr: 0.0.0.0/0
+    ## Define an exception list of IP ranges to be excluded from the allowedExtCidr
+    blockedCidrs:
+      ## Setting this true blocks a default set of CIDR blocks as follows
+      ## 100.64.0.0/10, 10.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12 && 192.168.0.0/16
+      {{- if (eq "eks" $provider) }}
+      defaultBlock: false
+      additionalBlockedCidrs:
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 127.0.0.0/8
+        - 192.168.0.0/16
+      {{- else }}
+      defaultBlock: true
+      {{- end }}
+  ## Pod Selection overrides (will be mostly used in QCS)
+  ## Override default release label .Release.Name
+  podSelections:
+    redis:
+      additionalPodLabels:
+        role: master
+
+### Additional variant of reloads
+reloadVariants:
+## isolated reloads, max reload = 1
+- name: "iso"
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 100
+    metric:
+# this is for new isolation mode, IM_6002_ODBC_RELOAD_ISOLATION
+      name: "connector_active_data_requests"
+      targetAverageValue: 2.8
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: qlik.com/dedicated
+                  operator: In
+                  values:
+                    - connector
+    tolerations:
+      - key: "qlik.com/dedicated"
+        operator: "Equal"
+        value: "connector"
+        effect: "NoSchedule"
+    terminationGracePeriodSeconds: 10800
+    data-connector-odbc:
+      resources:
+        limits:
+          memory: "6Gi"
+        requests:
+          cpu: 2
+          memory: "4Gi"
+      configs:
+        enableShutdownDrain: "true"
+        shutdownTimeout: "10800"
+# this is for new isolation mode, IM_6002_ODBC_RELOAD_ISOLATION
+        hostMode: "1"
+        dataHostUseIpc: "0" # don't use IPC
+        maxActiveReloads: "4"
+        reloadsAboveMaxAllowance: "2"
+        # enable messaging
+        natsEnabled: "true"
+        messagingEnabled: "true"
+        messagingPublishingenabled: "true"
+        solaceEnabled: "true"
+        messagingFeatureflagsEnablefeatureflagservicecall: "true"
+        messagingAddhealthcheck: "true"
+        ## this enables the odbc driver logs at info level
+        ## if for any region, it needs to be enabled at higher level
+        ##   enable it separately
+        # odbcDriversLog: postgres,snowflake,mssql,mysql,athena,servicenow
+        # odbcDriversLogLevel: 3
+        datachunkWriteTimeout: 600
+        dotnetRollForward: "LatestMajor"
+        data:
+          logLevel: true
+          dataHost: true
+          dataPortRangeStart: true
+          dataPortRangeEnd: true
+          standalone: true
+          config: true
+          serviceMode: true
+          qsEnvironment: true
+          redisUri: true
+          reuseReloadSession: true
+          reloadSessionLife: true
+          tokenAuthSubject: true
+          otlpAgentPort: true
+          natsUri: true
+          natsStreamingClusterId: true
+          natsAuthenabled: true
+          edgeAuthUri: true
+          featureFlagsUri: true
+          solaceUri: true
+          solaceMessageVpn: true
+          solaceSkipCertValidation: true
+          secretKeyFile: true
+          secretKeyFileRefreshIntervalMilliseconds: true
+
+## Pool for Direct Query
+- name: "dq"
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 20
+    apiVersion: "autoscaling/v2" # no longer needed after upgrade to qlikcommon 3.4.0
+    metric:
+      name: "connector_active_getdata_requests"
+      targetAverageValue: 100
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: qlik.com/dedicated
+                  operator: In
+                  values:
+                    - connector
+    tolerations:
+      - key: "qlik.com/dedicated"
+        operator: "Equal"
+        value: "connector"
+        effect: "NoSchedule"
+    terminationGracePeriodSeconds: 600
+    data-connector-odbc:
+      resources:
+        limits:
+          memory: "5Gi"
+        requests:
+{{- if or (eq $environment "stage" "fed-stage" "qcs-int") (eq $enable_capacity_reduction "true") }}
+          cpu: 0.25
+          memory: "1Gi"
+{{- else }}
+          cpu: 0.75
+          memory: "1.5Gi"
+{{- end }}
+      configs:
+        enableShutdownDrain: "true"
+        shutdownTimeout: "600" # only wait 10 mins
+        maxActiveReloads: "120"
+        reloadsAboveMaxAllowance: "80"
+        dotnetMinWorkerThreads: "500"
+        dotnetComplusGcserver: "1"
+        dotnetRollForward: "LatestMajor"
+        reuseReloadSession: "true"
+        reloadSessionLife: "300"
+        maxRejectCount: "0"
+        driverConnectionParameters: '{"snowflake":{"QUERY_TAG":"Qlik Direct Query"}}'
+        datachunkWriteTimeout: 600
+        data:
+          logLevel: true
+          dataHost: true
+          dataPortRangeStart: true
+          dataPortRangeEnd: true
+          standalone: true
+          config: true
+          serviceMode: true
+          qsEnvironment: true
+          redisUri: true
+      probes:
+        timeoutSeconds: 10
+
+{{- if and (or (eq $environment "stage") (eq $environment "prod")) (eq "us-east-1" $region) }}
+## Pool for running large number of concurrent reloads
+- name: "iso-large"
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 15
+    apiVersion: "autoscaling/v2" # no longer needed after upgrade to qlikcommon 3.4.0
+    metric:
+      name: "connector_active_getdata_requests"
+      targetAverageValue: 10
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: qlik.com/dedicated
+                  operator: In
+                  values:
+                    - connector
+    tolerations:
+      - key: "qlik.com/dedicated"
+        operator: "Equal"
+        value: "connector"
+        effect: "NoSchedule"
+    annotations:
+      prometheus.io/job: data-connector-odbc-rld
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "3005"
+    terminationGracePeriodSeconds: 10800
+    data-connector-odbc:
+      resources:
+        limits:
+          memory: "3Gi"
+        requests:
+{{- if (eq $environment "stage") }}
+          cpu: 0.25
+          memory: "500Mi"
+{{- else }}
+          cpu: 0.75
+          memory: "1.5Gi"
+{{- end }}
+      configs:
+        enableShutdownDrain: "true"
+        shutdownTimeout: "10800"
+        maxActiveReloads: "12"
+        reloadsAboveMaxAllowance: "5"
+        maxRejectCount: "0"
+        reuseReloadSession: "true"
+        reloadSessionLife: "30"
+        natsEnabled: "true"
+        messagingEnabled: "true"
+        messagingPublishingenabled: "true"
+        solaceEnabled: "true"
+        messagingFeatureflagsEnablefeatureflagservicecall: "true"
+        messagingAddhealthcheck: "true"
+        datachunkWriteTimeout: 600
+        dotnetRollForward: "LatestMajor"
+        data:
+          logLevel: true
+          dataHost: true
+          dataPortRangeStart: true
+          dataPortRangeEnd: true
+          standalone: true
+          config: true
+          serviceMode: true
+          qsEnvironment: true
+          redisUri: true
+          tokenAuthSubject: true
+          otlpAgentPort: true
+          natsUri: true
+          natsStreamingClusterId: true
+          natsAuthenabled: true
+          edgeAuthUri: true
+          featureFlagsUri: true
+          solaceUri: true
+          solaceMessageVpn: true
+          solaceSkipCertValidation: true
+          secretKeyFile: true
+          secretKeyFileRefreshIntervalMilliseconds: true
+      probes:
+        timeoutSeconds: 10
+{{- end }}
+
+redis:
+  enabled: true
+  usePassword: true
+  {{- if $useSealedSecrets }}
+  existingSecret: data-connector-odbc-sealed-secrets
+  existingSecretPasswordKey: redisPassword
+  {{- else }}
+  password: {{ ( ds "vault" "redisPassword").value | printf "%q" }}
+  {{- end }}
+  cluster:
+    enabled: true
+    slaveCount: 1
+  master:
+    service:
+      type: ClusterIP
+    podAnnotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    persistence:
+      enabled: false
+    ## Resource requests and limits for master node
+    resources:
+      requests:
+        memory: 180Mi
+        cpu: 100m
+      limits:
+        memory: 384Mi
+    nodeSelector:
+      {{- if eq $karpenterEnabled "true" }}
+      qlik.com/dedicated: general-low-disruption
+      {{- else }}
+      qlik.com/dedicated: connector
+      {{- end }}
+    tolerations:
+      - key: "qlik.com/dedicated"
+        operator: "Equal"
+        value: "connector"
+        effect: "NoSchedule"
+  slave:
+    service:
+      type: ClusterIP
+    persistence:
+      enabled: false
+    ## Resource requests and limits for slave nodes
+    resources:
+      requests:
+        memory: 180Mi
+        cpu: 50m
+      limits:
+        memory: 384Mi
+    nodeSelector:
+      {{- if eq $karpenterEnabled "true" }}
+      qlik.com/dedicated: general-low-disruption
+      {{- else }}
+      qlik.com/dedicated: connector
+      {{- end }}
+    tolerations:
+      - key: "qlik.com/dedicated"
+        operator: "Equal"
+        value: "connector"
+        effect: "NoSchedule"
+  metrics:
+    resources:
+      requests:
+        memory: 50Mi
+        cpu: 2m
+      limits:
+        memory: 100Mi

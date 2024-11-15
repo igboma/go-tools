@@ -1,0 +1,148 @@
+name: Validate Helm Chart Manifests with Kubeconform
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to run the workflow on (for specific component validation)"
+        required: false
+        default: "master"
+      component:
+        description: "Component to validate (for specific component validation)"
+        required: false
+      view_gomplate:
+        description: "Enable viewing the gomplated file (for specific component validation)"
+        required: false
+        default: false
+        type: boolean
+      view_manifest:
+        description: "Enable viewing the generated manifest (for specific component validation)"
+        required: false
+        default: false
+        type: boolean
+
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      # Print GitHub event information
+      # - name: Print event info
+      #   uses: qlik-trial/qlik-releaser/.github/actions/print-event-info@master
+
+      # Checkout primary repository (codebase under test)
+      - name: Checkout primary repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+
+      # Display the checked-out branch
+      - name: Display checked-out branch
+        run: |
+          echo "Checked out branch: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}"
+
+      # Conditional steps based on triggers
+      - name: Determine values.yaml files
+        if: ${{ github.event.inputs.component }}
+        run: |
+          echo "Validating component: ${{ github.event.inputs.component }}"
+          component_path="qcs/${{ github.event.inputs.component }}/values.yaml"
+          echo "VALUES_FILE_PATH=$component_path" >> $GITHUB_ENV
+
+      - name: Get all values.yaml files (for manual trigger)
+        if: ${{ github.event_name == 'workflow_dispatch' && !github.event.inputs.component }}
+        run: |
+          values_files=$(find qcs -type f -name "values.yaml")
+          echo "All values files found:"
+          echo "$values_files"
+          values_files_space_separated=$(echo "$values_files" | tr '\n' ' ')
+          echo "VALUES_FILE_PATH=$values_files_space_separated" >> $GITHUB_ENV
+
+      - name: Get changed values.yaml files (for push/pull_request triggers)
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        id: changed-values-files-yaml
+        uses: tj-actions/changed-files@v41
+        with:
+          files: 'qcs/*/values.yaml'
+
+      # Set the files to an environment variable
+      - name: Set files to an environment variable
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Setting files from manual trigger..."
+            echo "FILES=${{ env.VALUES_FILE_PATH }}" >> $GITHUB_ENV
+          else
+            echo "Setting files from changed files..."
+            echo "FILES=${{ steps.changed-values-files-yaml.outputs.all_changed_files }}" >> $GITHUB_ENV
+
+      - name: Display files set in the environment variable
+        run: |
+          echo "Files set in the environment variable:"
+          echo "${{ env.FILES }}"
+
+      # Load exceptions list if available
+      - name: Load exceptions list
+        id: load-exceptions
+        run: |
+          if [[ -f "helmchart-validation-exceptions.yaml" ]]; then
+            echo "Loading exceptions from helmchart-validation-exceptions.yaml"
+            exceptions=$(yq '.exceptions' helmchart-validation-exceptions.yaml | tr '\n' ' ')
+          else
+            echo "No helmchart-validation-exceptions.yaml file found; proceeding without exceptions."
+            exceptions=""
+          fi
+          echo "exceptions=$exceptions" >> $GITHUB_ENV
+
+      # Checkout gitops-environments repository for environment configurations
+      # - name: Checkout gitops-environments repository
+      #   uses: actions/checkout@v4
+      #   with:
+      #     repository: qlik-trial/gitops-environments
+      #     token: ${{ secrets.GH_ACCESS_TOKEN_4 }}
+      #     path: gitops-environments
+      #     ref: main
+
+      # Install gomplate templating tool
+      - name: Install gomplate
+        run: |
+          mkdir bin
+          curl -o bin/gomplate -L "https://github.com/hairyhenderson/gomplate/releases/download/v3.10.0/gomplate_linux-amd64"
+          chmod +x bin/gomplate
+          echo "${PWD}/bin" >> $GITHUB_PATH
+
+      # Install Helm for managing Kubernetes charts
+      - name: Install Helm
+        uses: azure/setup-helm@v4.1.0
+        with:
+          version: 'v3.14.3'
+
+      # Install Kubeconform for validating Kubernetes manifests
+      - name: Install Kubeconform
+        run: |
+          curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+          rm kubeconform.tar.gz
+
+      # - name: Helm login to GHCR
+      #   shell: bash
+      #   run: |
+      #     echo ${{ secrets.QLIK_DOCKER_DEV_PASSWORD }} | helm registry login --username ${{ secrets.QLIK_DOCKER_DEV_USERNAME }} --password-stdin ${{ secrets.QLIK_DOCKER_DEV_REGISTRY }}/helm
+
+      # Process, template, and validate YAML files
+      - name: Process files, create sealed-secrets structure, and validate Helm template
+        env:
+          exceptions: ${{ env.exceptions }}
+        run: |
+          set +e
+          files=(${FILES})
+          echo "Processing files: ${files[@]}"
+          # Add processing and validation logic here as described in the detailed block

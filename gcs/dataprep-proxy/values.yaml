@@ -1,0 +1,88 @@
+## Dataprep-proxy
+## Default values: https://github.com/qlik-trial/dataprep-proxy/blob/main/manifests/chart/dataprep-proxy/values.yaml
+
+{{- $provider := getenv "PROVIDER" "aws" }}
+{{ $registry := getenv "CONTAINER_REGISTRY_URL" "" -}}
+{{ $env := getenv "ENVIRONMENT" "local" -}}
+{{ $region := getenv "REGION" "localregion" -}}
+{{ $useSealedSecrets := and (ne $provider "fedramp") (or (eq $env "stage") (eq $env "qcs-int")) -}}
+
+global:
+  imageRegistry: {{ $registry }}
+
+image:
+  # negate pullSecrets so that it will not be rendered and log warnings
+  # in Splunk, the default value is artifactory-docker-secret which is
+  # used in our builds, Forts, and in SDEs
+  pullSecrets: ~
+
+configs:
+  terminationGracePeriodSeconds: 120
+  data:
+    # evaluate dependent services when determining readiness
+    dependentServicesReadinessCheckEnabled: true
+    # Log level (debug|info|warn|error)
+    logLevel: info
+    # dataprepUri is the uri to use for dataprep communication
+    dataprepUri: "http://data-prep.default.svc.cluster.local:9072"
+    # ingressAuthUrl is the url for the ingress auth service
+    ingressAuthUrl: "http://edge-auth.default.svc.cluster.local:8080/v1/auth"
+    # Enable Tracing capabilities in the service
+    tracingEnabled: true
+
+{{- if $useSealedSecrets }}
+secrets: ~
+
+{{ file.Read (path.Join "dataprep-proxy-values/qcs/dataprep-proxy/sealed-secrets/" $env $region "sealed-secrets.yaml") }}
+{{- else }}
+secrets:
+  stringData:
+    mongodbUri: {{ ( ds "vault" "mongoURI").value }}
+{{- end}}
+
+deployment:
+  replicas: 2
+  container:
+    resources:
+      limits:
+        memory: 2.5Gi
+      requests:
+        cpu: "1000m"
+        memory: 1.5Gi
+
+networkPolicy:
+  ## ipBlock configs: this selects particular IP CIDR ranges to allow as egress destinations
+  ipBlock:
+    ## The External CIDR block that the pod is allowed to connect to
+    allowedExtCidr: 0.0.0.0/0
+    ## Define an exception list of IP ranges to be excluded from the allowedExtCidr
+    blockedCidrs:
+      ## Setting this true blocks a default set of CIDR blocks as follows
+      ## 100.64.0.0/10, 10.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 127.0.0.0/8 && 192.168.0.0/16
+      {{- if (eq "eks" $provider) }}
+      defaultBlock: false
+      additionalBlockedCidrs:
+        - 100.64.0.0/10
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 127.0.0.0/8
+        - 192.168.0.0/16
+      {{- else }}
+      defaultBlock: true
+      {{- end }}
+  ## Pod Selection overrides (will be mostly used in QCS)
+  ## Override default release label .Release.Name
+  podSelections:
+    data-prep:
+      release: data-prep
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  metric:
+    name: "dataprep_proxy_active_websocket_sessions"
+    targetAverageValue: 2000
+
+tracing:
+  enabled: true
