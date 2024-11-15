@@ -33,10 +33,6 @@ jobs:
   validate-manifests:
     runs-on: ubuntu-latest
     steps:
-      # Print GitHub event information
-      # - name: Print event info
-      #   uses: qlik-trial/qlik-releaser/.github/actions/print-event-info@master
-
       # Checkout primary repository (codebase under test)
       - name: Checkout primary repository
         uses: actions/checkout@v4
@@ -49,7 +45,7 @@ jobs:
         run: |
           echo "Checked out branch: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}"
 
-      # Conditional steps based on triggers
+      # Determine files based on trigger
       - name: Determine values.yaml files
         if: ${{ github.event.inputs.component }}
         run: |
@@ -76,12 +72,13 @@ jobs:
       # Set the files to an environment variable
       - name: Set files to an environment variable
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Setting files from manual trigger..."
             echo "FILES=${{ env.VALUES_FILE_PATH }}" >> $GITHUB_ENV
           else
             echo "Setting files from changed files..."
             echo "FILES=${{ steps.changed-values-files-yaml.outputs.all_changed_files }}" >> $GITHUB_ENV
+          fi
 
       - name: Display files set in the environment variable
         run: |
@@ -100,15 +97,6 @@ jobs:
             exceptions=""
           fi
           echo "exceptions=$exceptions" >> $GITHUB_ENV
-
-      # Checkout gitops-environments repository for environment configurations
-      # - name: Checkout gitops-environments repository
-      #   uses: actions/checkout@v4
-      #   with:
-      #     repository: qlik-trial/gitops-environments
-      #     token: ${{ secrets.GH_ACCESS_TOKEN_4 }}
-      #     path: gitops-environments
-      #     ref: main
 
       # Install gomplate templating tool
       - name: Install gomplate
@@ -132,11 +120,6 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
           rm kubeconform.tar.gz
 
-      # - name: Helm login to GHCR
-      #   shell: bash
-      #   run: |
-      #     echo ${{ secrets.QLIK_DOCKER_DEV_PASSWORD }} | helm registry login --username ${{ secrets.QLIK_DOCKER_DEV_USERNAME }} --password-stdin ${{ secrets.QLIK_DOCKER_DEV_REGISTRY }}/helm
-
       # Process, template, and validate YAML files
       - name: Process files, create sealed-secrets structure, and validate Helm template
         env:
@@ -145,4 +128,4 @@ jobs:
           set +e
           files=(${FILES})
           echo "Processing files: ${files[@]}"
-          # Add processing and validation logic here as described in the detailed block
+          # Add processing and validation logic here
