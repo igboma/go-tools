@@ -1,4 +1,4 @@
-name: Validate Helm Chart Manifests with Kubeconform
+name: Helm Chart Manifests Validator with Kubeconform
 
 on:
   workflow_dispatch:
@@ -43,9 +43,9 @@ jobs:
       # Display the checked-out branch
       - name: Display checked-out branch
         run: |
-          echo "Checked out branch: ${{ github.event.inputs.branch || github.event.pull_request.head.ref || github.ref_name }}"
+          echo "Checked out branch: ${{ github.event.inputs.branch || github.ref_name }}"
 
-      # Determine files based on trigger
+      # Determine values.yaml files based on triggers
       - name: Determine values.yaml files
         if: ${{ github.event.inputs.component }}
         run: |
@@ -69,7 +69,7 @@ jobs:
         with:
           files: 'qcs/*/values.yaml'
 
-      # Set the files to an environment variable
+      # Set files to an environment variable
       - name: Set files to an environment variable
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -98,6 +98,12 @@ jobs:
           fi
           echo "exceptions=$exceptions" >> $GITHUB_ENV
 
+      # Install yq for YAML processing
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
       # Install gomplate templating tool
       - name: Install gomplate
         run: |
@@ -106,7 +112,7 @@ jobs:
           chmod +x bin/gomplate
           echo "${PWD}/bin" >> $GITHUB_PATH
 
-      # Install Helm for managing Kubernetes charts
+      # Install Helm for Kubernetes chart management
       - name: Install Helm
         uses: azure/setup-helm@v4.1.0
         with:
@@ -120,12 +126,54 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
           rm kubeconform.tar.gz
 
-      # Process, template, and validate YAML files
-      - name: Process files, create sealed-secrets structure, and validate Helm template
+      # Process and validate files
+      - name: Process and validate YAML files
         env:
           exceptions: ${{ env.exceptions }}
         run: |
           set +e
-          files=(${FILES})
+          IFS=' ' read -r -a files <<< "${FILES}"
           echo "Processing files: ${files[@]}"
-          # Add processing and validation logic here
+          SCRIPT_BASE=$(pwd)
+
+          skipped_summaries_file="skipped_summaries.txt"
+          failed_summaries_file="failed_summaries.txt"
+          success_summaries_file="success_summaries.txt"
+          : > "$skipped_summaries_file"
+          : > "$failed_summaries_file"
+          : > "$success_summaries_file"
+
+          total_files=${#files[@]}
+          file_count=1
+
+          components=()
+          for file in "${files[@]}"; do
+            component=$(echo "$file" | awk -F'/' '{print $2}')
+            
+            echo "Processing file $file_count of $total_files: $file (Component: $component)"
+            file_count=$((file_count + 1))
+
+            # Skip components listed in exceptions
+            if [[ " $exceptions " =~ " $component " ]]; then
+              echo "Skipping component $component as it is in the exceptions list." >> "$skipped_summaries_file"
+              continue
+            fi
+
+            # Copy all content, including directories and files, from qcs/$component to ${component}-values/qcs/$component
+            source_dir="qcs/$component"
+            target_dir="${component}-values/qcs/$component"
+
+            if [[ -d "$source_dir" ]]; then
+              mkdir -p "$target_dir"
+              cp -a "$source_dir/." "$target_dir/"
+              echo "All content from $source_dir copied to $target_dir"
+            else
+              echo "Source directory $source_dir does not exist; skipping."
+            fi
+
+            # Add component to unique components list if not already included
+            if [[ ! " ${components[*]} " =~ " $component " ]]; then
+              components+=("$component")
+            fi
+          done
+          echo "Unique components: ${components[@]}"
